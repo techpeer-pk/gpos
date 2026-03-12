@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPOS — Free POS for Every Business</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Mulish:wght@300;400;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --green: #00C896;
+      --green-dark: #00a07a;
+      --green-glow: rgba(0, 200, 150, 0.15);
+      --bg: #0a0f0d;
+      --bg2: #0f1a15;
+      --bg3: #162218;
+      --card: #111c17;
+      --border: rgba(0, 200, 150, 0.15);
+      --text: #e8f5f0;
+      --muted: #7a9e8e;
+      --white: #ffffff;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Mulish', sans-serif;
+      overflow-x: hidden;
+      line-height: 1.6;
+    }
+
+    /* Noise overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.4;
+    }
+
+    /* Glow blobs */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .blob1 {
+      width: 400px;
+      height: 400px;
+      background: rgba(0, 200, 150, 0.07);
+      top: -100px;
+      right: -100px;
+    }
+
+    .blob2 {
+      width: 300px;
+      height: 300px;
+      background: rgba(0, 200, 150, 0.05);
+      bottom: 200px;
+      left: -80px;
+    }
+
+    /* NAV */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.2rem 5%;
+      background: rgba(10, 15, 13, 0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.4rem;
+      color: var(--green);
+      letter-spacing: -0.5px;
+    }
+
+    .nav-logo span {
+      color: var(--text);
+    }
+
+    .nav-btn {
+      background: var(--green);
+      color: #0a0f0d;
+      border: none;
+      padding: 0.6rem 1.4rem;
+      border-radius: 6px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .nav-btn:hover {
+      background: var(--green-dark);
+      transform: translateY(-1px);
+    }
+
+    /* SECTIONS */
+    section {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* HERO */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 8rem 5% 5rem;
+    }
+
+    .lang-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--green-glow);
+      border: 1px solid var(--border);
+      color: var(--green);
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.4rem 1rem;
+      border-radius: 100px;
+      margin-bottom: 2rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      animation: fadeDown 0.6s ease both;
+    }
+
+    .hero h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(2.8rem, 7vw, 5.5rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -2px;
+      color: var(--white);
+      animation: fadeUp 0.7s ease 0.1s both;
+      max-width: 900px;
+    }
+
+    .hero h1 span {
+      color: var(--green);
+    }
+
+    .hero-urdu {
+      font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+      color: var(--muted);
+      margin-top: 1.2rem;
+      font-style: italic;
+      animation: fadeUp 0.7s ease 0.2s both;
+    }
+
+    .hero-urdu strong {
+      color: var(--green);
+      font-style: normal;
+    }
+
+    .hero-sub {
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 560px;
+      margin: 1.5rem auto 0;
+      animation: fadeUp 0.7s ease 0.3s both;
+    }
+
+    .hero-btns {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2.5rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      animation: fadeUp 0.7s ease 0.4s both;
+    }
+
+    .btn-primary {
+      background: var(--green);
+      color: #0a0f0d;
+      border: none;
+      padding: 0.9rem 2rem;
+      border-radius: 8px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary:hover {
+      background: var(--green-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0, 200, 150, 0.3);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0.9rem 2rem;
+      border-radius: 8px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 3rem;
+      margin-top: 4rem;
+      animation: fadeUp 0.7s ease 0.5s both;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .stat {
+      text-align: center;
+    }
+
+    .stat-num {
+      font-family: 'Syne', sans-serif;
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--green);
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* TRUST SECTION */
+    .trust {
+      padding: 6rem 5%;
+      background: var(--bg2);
+    }
+
+    .section-label {
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--green);
+      margin-bottom: 1rem;
+    }
+
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      font-weight: 800;
+      text-align: center;
+      color: var(--white);
+      letter-spacing: -1px;
+      line-height: 1.1;
+    }
+
+    .section-urdu {
+      text-align: center;
+      font-size: 1rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: 0.5rem;
+      margin-bottom: 3.5rem;
+    }
+
+    .trust-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .trust-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      transition: all 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .trust-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .trust-card:hover {
+      border-color: var(--green);
+      transform: translateY(-4px);
+    }
+
+    .trust-card:hover::before {
+      opacity: 1;
+    }
+
+    .trust-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--green-glow);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .trust-card h3 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--white);
+      margin-bottom: 0.4rem;
+    }
+
+    .trust-card .urdu-text {
+      font-size: 0.85rem;
+      color: var(--green);
+      font-style: italic;
+      margin-bottom: 0.8rem;
+    }
+
+    .trust-card p {
+      font-size: 0.92rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* DATA FLOW */
+    .dataflow {
+      padding: 6rem 5%;
+    }
+
+    .flow-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .flow-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 0;
+      position: relative;
+    }
+
+    .flow-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .flow-title.bad {
+      color: #ff6b6b;
+    }
+
+    .flow-title.good {
+      color: var(--green);
+    }
+
+    .flow-urdu {
+      font-size: 0.82rem;
+      font-style: italic;
+      opacity: 0.7;
+      margin-bottom: 1rem;
+    }
+
+    .flow-steps {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .flow-step {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 0.5rem 0.9rem;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .flow-arrow {
+      color: var(--muted);
+      font-size: 1.2rem;
+    }
+
+    .flow-step.highlight {
+      background: var(--green-glow);
+      border-color: var(--green);
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .flow-step.danger {
+      background: rgba(255, 107, 107, 0.1);
+      border-color: rgba(255, 107, 107, 0.3);
+      color: #ff6b6b;
+    }
+
+    .vs-divider {
+      text-align: center;
+      padding: 1.5rem 0;
+      font-family: 'Syne', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--muted);
+    }
+
+    /* FEATURES */
+    .features {
+      padding: 6rem 5%;
+      background: var(--bg2);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.2rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .feature-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.4rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      transition: all 0.2s;
+    }
+
+    .feature-item:hover {
+      border-color: var(--green);
+    }
+
+    .feature-emoji {
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .feature-text h4 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: var(--white);
+      margin-bottom: 0.2rem;
+    }
+
+    .feature-text .f-urdu {
+      font-size: 0.78rem;
+      color: var(--green);
+      font-style: italic;
+    }
+
+    /* WHO IS IT FOR */
+    .audience {
+      padding: 6rem 5%;
+    }
+
+    .audience-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .audience-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      transition: all 0.3s;
+    }
+
+    .audience-card:hover {
+      border-color: var(--green);
+      transform: translateY(-4px);
+    }
+
+    .audience-emoji {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .audience-card h3 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--white);
+      margin-bottom: 0.3rem;
+    }
+
+    .audience-card .a-urdu {
+      font-size: 0.82rem;
+      color: var(--green);
+      font-style: italic;
+    }
+
+    /* OBJECTIONS */
+    .objections {
+      padding: 6rem 5%;
+      background: var(--bg2);
+    }
+
+    .obj-list {
+      max-width: 750px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .obj-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.6rem;
+    }
+
+    .obj-q {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #ff9f9f;
+      margin-bottom: 0.3rem;
+    }
+
+    .obj-q-urdu {
+      font-size: 0.82rem;
+      color: rgba(255, 159, 159, 0.6);
+      font-style: italic;
+      margin-bottom: 0.8rem;
+    }
+
+    .obj-a {
+      font-size: 0.92rem;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    .obj-a-urdu {
+      font-size: 0.85rem;
+      color: var(--green);
+      font-style: italic;
+      margin-top: 0.4rem;
+    }
+
+    /* CTA */
+    .cta {
+      padding: 8rem 5%;
+      text-align: center;
+    }
+
+    .cta-card {
+      max-width: 700px;
+      margin: 0 auto;
+      background: linear-gradient(135deg, var(--bg3) 0%, var(--card) 100%);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 4rem 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, var(--green), transparent);
+    }
+
+    .cta h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      color: var(--white);
+      letter-spacing: -1px;
+      line-height: 1.1;
+      margin-bottom: 0.5rem;
+    }
+
+    .cta h2 span {
+      color: var(--green);
+    }
+
+    .cta-urdu {
+      font-size: 1rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-bottom: 2rem;
+    }
+
+    .cta-urdu strong {
+      color: var(--green);
+      font-style: normal;
+    }
+
+    .free-tag {
+      display: inline-block;
+      background: var(--green-glow);
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 0.8rem;
+      padding: 0.3rem 1rem;
+      border-radius: 100px;
+      margin-bottom: 2rem;
+      letter-spacing: 2px;
+    }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem 5%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: gap;
+      position: relative;
+      z-index: 1;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .footer-logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      color: var(--green);
+      font-size: 1.1rem;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+    }
+
+    .footer-links a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.85rem;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: var(--green);
+    }
+
+    .footer-made {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    /* ANIMATIONS */
+    @keyframes fadeDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 600px) {
+      .hero-stats {
+        gap: 2rem;
+      }
+
+      .cta-card {
+        padding: 2.5rem 1.5rem;
+      }
+
+      footer {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .flow-steps {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .flow-arrow {
+        transform: rotate(90deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="blob blob1"></div>
+  <div class="blob blob2"></div>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-logo">G<span>POS</span></div>
+    <a href="https://gpos-web.web.app/login" target="_blank" class="nav-btn">Try Free →</a>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="lang-badge">🇵🇰 English + Roman Urdu</div>
+    <h1>Free POS for Every<br><span>Pakistani Business</span></h1>
+    <p class="hero-urdu">
+      "Aapka apna ghar — <strong>hum ne sirf darwaza banaya.</strong>"<br>
+      <small style="font-size:0.8em; opacity:0.7">(Your own house — we just built the door.)</small>
+    </p>
+    <p class="hero-sub">
+      No monthly fees. No hidden charges. Your data stays in YOUR account. Forever.
+    </p>
+    <div class="hero-btns">
+      <a href="https://gpos-web.web.app/login" target="_blank" class="btn-primary">🚀 Try Live Demo</a>
+      <a href="https://github.com/Silverado313/gpos" target="_blank" class="btn-secondary">⭐ View Source Code</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat">
+        <div class="stat-num">PKR 0</div>
+        <div class="stat-label">Forever Free</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">3+</div>
+        <div class="stat-label">Business Types</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">100%</div>
+        <div class="stat-label">Your Data</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">MIT</div>
+        <div class="stat-label">Open Source</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUST -->
+  <section class="trust">
+    <div class="section-label">Trust & Transparency</div>
+    <h2 class="section-title">"Free forever? Yaqeen nahi aata."</h2>
+    <p class="section-urdu">Bilkul theek keh rahe ho — lekin GPOS alag hai. Samjhao toh sahi.</p>
+
+    <div class="trust-grid">
+      <div class="trust-card">
+        <div class="trust-icon">🔓</div>
+        <h3>Open Source Code</h3>
+        <div class="urdu-text">"Code khud dekh lo" — koi secret nahi</div>
+        <p>Every single line of GPOS is public on GitHub. No hidden servers. No secret data collection. Verify it
+          yourself before trusting it.</p>
+      </div>
+      <div class="trust-card">
+        <div class="trust-icon">☁️</div>
+        <h3>Your Own Firebase Account</h3>
+        <div class="urdu-text">Aapka apna account — hamara koi access nahi</div>
+        <p>You connect your own free Firebase account. We never touch your data. Even if GPOS shuts down tomorrow, your
+          data stays safe with you.</p>
+      </div>
+      <div class="trust-card">
+        <div class="trust-icon">🚫</div>
+        <h3>No Account With Us</h3>
+        <div class="urdu-text">Hamse koi account nahi banana — sirf apna Firebase</div>
+        <p>You never sign up with GPOS. You never give us your email or phone. We simply cannot charge you later because
+          we don't even know who you are.</p>
+      </div>
+      <div class="trust-card">
+        <div class="trust-icon">💸</div>
+        <h3>Firebase Free Tier is Real</h3>
+        <div class="urdu-text">Google ka free tier chhoti businesses ke liye kaafi hai</div>
+        <p>Firebase's free tier supports thousands of transactions per month. For a small shop or restaurant, it's
+          genuinely enough. Google backs this infrastructure.</p>
+      </div>
+      <div class="trust-card">
+        <div class="trust-icon">⚖️</div>
+        <h3>MIT License</h3>
+        <div class="urdu-text">License padh lo — hamesha free rehne ki guarantee</div>
+        <p>MIT License is a legal document. It guarantees GPOS will always remain free to use, modify, and distribute.
+          No one can change this later.</p>
+      </div>
+      <div class="trust-card">
+        <div class="trust-icon">🛡️</div>
+        <h3>Self-Hostable</h3>
+        <div class="urdu-text">Chaaho toh apne server pe lagao — hum par depend mat raho</div>
+        <p>If you're technical or know a developer, you can host GPOS entirely on your own server. Zero dependency on
+          us, ever.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATA FLOW COMPARISON -->
+  <section class="dataflow">
+    <div class="section-label">How It Works</div>
+    <h2 class="section-title" style="text-align:center;">Aapka Data Kahan Jata Hai?</h2>
+    <p class="section-urdu" style="text-align:center; margin-bottom:3rem;">Doosre apps vs GPOS — farq samjho</p>
+
+    <div class="flow-container">
+      <div class="flow-box">
+        <div class="flow-title bad">❌ Doosre "Free" Apps</div>
+        <div class="flow-urdu">Aapka data unke server pe — woh jo chahein kar saktay hain</div>
+        <div class="flow-steps">
+          <div class="flow-step">Your Sales Data</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step danger">Their Server</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step danger">Suddenly Paid 💸</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step danger">Data Hostage 😰</div>
+        </div>
+      </div>
+
+      <div class="vs-divider">VS</div>
+
+      <div class="flow-box">
+        <div class="flow-title good">✅ GPOS</div>
+        <div class="flow-urdu">Aapka data aapke apne Firebase mein — hum sirf software hain</div>
+        <div class="flow-steps">
+          <div class="flow-step">Your Sales Data</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step highlight">YOUR Firebase ☁️</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step highlight">Always Yours ✅</div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step highlight">Forever Free ♾️</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features">
+    <div class="section-label">Features</div>
+    <h2 class="section-title">Sab Kuch Jo Chahiye</h2>
+    <p class="section-urdu" style="margin-bottom:3rem;">Chhoti business ke liye poora POS system — bilkul muft</p>
+
+    <div class="features-grid">
+      <div class="feature-item">
+        <div class="feature-emoji">🛒</div>
+        <div class="feature-text">
+          <h4>Fast POS Screen</h4>
+          <div class="f-urdu">Jaldi sale karo — aasaan checkout</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-emoji">📦</div>
+        <div class="feature-text">
+          <h4>Inventory Management</h4>
+          <div class="f-urdu">Stock track karo, alerts pao</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-emoji">👥</div>
+        <div class="feature-text">
+          <h4>Customer Profiles</h4>
+          <div class="f-urdu">Customer history aur loyalty points</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-emoji">📊</div>
+        <div class="feature-text">
+          <h4>Sales Reports</h4>
+          <div class="f-urdu">Roz ki kamai — ek nazar mein</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-emoji">🧾</div>
+        <div class="feature-text">
+          <h4>Receipt Printing</h4>
+          <div class="f-urdu">Professional receipt — print karo</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-emoji">👨‍💼</div>
+        <div class="feature-text">
+          <h4>Employee Roles</h4>
+          <div class="f-urdu">Admin, Manager, Cashier — alag access</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-emoji">📱</div>
+        <div class="feature-text">
+          <h4>Mobile & Tablet Ready</h4>
+          <div class="f-urdu">Phone aur tablet pe bhi kaam karta hai</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-emoji">🌙</div>
+        <div class="feature-text">
+          <h4>Dark / Light Mode</h4>
+          <div class="f-urdu">Aankhen thakein nahi — dark mode available</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-emoji">💳</div>
+        <div class="feature-text">
+          <h4>Cash, Card & Credit</h4>
+          <div class="f-urdu">Har tarah ki payment accept karo</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHO IS IT FOR -->
+  <section class="audience">
+    <div class="section-label">Kis Ke Liye?</div>
+    <h2 class="section-title" style="text-align:center;">Har Business Type Ke Liye</h2>
+    <p class="section-urdu" style="text-align:center; margin-bottom:3rem;">Retail ho, restaurant ho ya service — GPOS
+      sab ke liye hai</p>
+
+    <div class="audience-grid">
+      <div class="audience-card">
+        <div class="audience-emoji">🏪</div>
+        <h3>Retail Shop</h3>
+        <div class="a-urdu">Kapray, grocery, electronics — koi bhi dukaan</div>
+      </div>
+      <div class="audience-card">
+        <div class="audience-emoji">🍽️</div>
+        <h3>Restaurant / Dhaba</h3>
+        <div class="a-urdu">Orders, tables, billing — sab ek jagah</div>
+      </div>
+      <div class="audience-card">
+        <div class="audience-emoji">💇</div>
+        <h3>Salon / Parlour</h3>
+        <div class="a-urdu">Services, appointments, customers</div>
+      </div>
+      <div class="audience-card">
+        <div class="audience-emoji">🔧</div>
+        <h3>Repair Shop</h3>
+        <div class="a-urdu">Mobile, AC, bijli — service track karo</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OBJECTIONS -->
+  <section class="objections">
+    <div class="section-label">Common Sawaal</div>
+    <h2 class="section-title" style="text-align:center;">Jo Sawaal Aapke Mann Mein Hain</h2>
+    <p class="section-urdu" style="text-align:center; margin-bottom:3rem;">Honest jawab — koi bhi chupao nahi</p>
+
+    <div class="obj-list">
+      <div class="obj-item">
+        <div class="obj-q">❓ "Free hai toh kuch toh chakkar hoga?"</div>
+        <div class="obj-q-urdu">Why would someone make something free?</div>
+        <div class="obj-a">No chakkar. GPOS is open source — built to help small businesses in Pakistan and to build a
+          developer community. The code is public. Read it yourself.</div>
+        <div class="obj-a-urdu">✅ Code GitHub pe hai — khud check karo. Koi secret nahi.</div>
+      </div>
+      <div class="obj-item">
+        <div class="obj-q">❓ "Kal band ho gaya toh mera data?"</div>
+        <div class="obj-q-urdu">What if GPOS shuts down?</div>
+        <div class="obj-a">Your data is in YOUR Firebase account — not ours. Even if this website disappears, your
+          Firebase account stays. Your data stays. Your business continues.</div>
+        <div class="obj-a-urdu">✅ Aapka data aapke saath — hamara koi lena dena nahi.</div>
+      </div>
+      <div class="obj-item">
+        <div class="obj-q">❓ "Baad mein charge karna shuru kar dega?"</div>
+        <div class="obj-q-urdu">Will you start charging later?</div>
+        <div class="obj-a">MIT License legally prevents this. And since you use your own Firebase — we literally cannot
+          charge you. We don't even know who you are.</div>
+        <div class="obj-a-urdu">✅ Hamein pata bhi nahi aap kaun ho — charge karein kaise?</div>
+      </div>
+      <div class="obj-item">
+        <div class="obj-q">❓ "Technical banda chahiye setup ke liye?"</div>
+        <div class="obj-q-urdu">Do I need a technical person to set it up?</div>
+        <div class="obj-a">Setup is simple — Firebase account banao, credentials dalo, done. If you still need help,
+          contact us. First 10 businesses get free setup support.</div>
+        <div class="obj-a-urdu">✅ Pehle 10 businesses ko free setup support milega — seedha message karo.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="cta-card">
+      <div class="free-tag">♾️ FREE FOREVER</div>
+      <h2>Abhi Try Karo —<br><span>Kuch Kho Nahi Saktay</span></h2>
+      <p class="cta-urdu">No credit card. No sign up with us. Bas apna <strong>free Firebase account</strong> chahiye.
+      </p>
+      <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+        <a href="https://gpos-web.web.app/login" target="_blank" class="btn-primary"
+          style="font-size:1.1rem; padding:1rem 2.5rem;">🚀 Live Demo Dekho</a>
+        <a href="https://github.com/Silverado313/gpos" target="_blank" class="btn-secondary">⭐ GitHub pe Star Karo</a>
+      </div>
+      <p style="font-size:0.8rem; color:var(--muted); margin-top:1.5rem;">
+        Made by <strong style="color:var(--green)">Syed Aneel Raza</strong> — Pakistani developer building for Pakistani
+        businesses 🇵🇰
+      </p>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">GPOS</div>
+    <div class="footer-links">
+      <a href="https://gpos-web.web.app/login" target="_blank">Live Demo</a>
+      <a href="https://github.com/Silverado313/gpos" target="_blank">GitHub</a>
+      <a href="https://linkedin.com/in/syedaneelraza" target="_blank">LinkedIn</a>
+    </div>
+    <div class="footer-made">Built with ❤️ for Pakistan 🇵🇰</div>
+  </footer>
+
+</body>
+
+</html>
