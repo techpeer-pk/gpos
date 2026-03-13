@@ -32,22 +32,35 @@ function Employees() {
 
     const [branches, setBranches] = useState([])
 
-    // Fetch employees (Both Active and Pending) from GLOBAL users collection
+    // Fetch employees (Both Active and Pending)
     const fetchApprovedEmployees = async () => {
         if (!businessId) return
         try {
-            // Query global users collection where businessId matches
-            const usersQuery = query(collection(db, 'users'), where('businessId', '==', businessId))
-            const snapshot = await getDocs(usersQuery)
+            // 1. Fetch ALL users for THIS business and filter for ACTIVE
+            // (Avoids composite index requirement for businessId + role != pending)
+            const bizUsersQuery = query(
+                collection(db, 'users'), 
+                where('businessId', '==', businessId)
+            )
+            const bizUsersSnapshot = await getDocs(bizUsersQuery)
+            const activeList = bizUsersSnapshot.docs
+                .map(doc => ({ uid: doc.id, ...doc.data() }))
+                .filter(u => u.role !== 'pending')
             
-            const list = snapshot.docs.map(doc => ({
+            setActiveEmployees(activeList)
+
+            // 2. Fetch ALL PENDING users (Global Pool)
+            const pendingQuery = query(
+                collection(db, 'users'), 
+                where('role', '==', 'pending')
+            )
+            const pendingSnapshot = await getDocs(pendingQuery)
+            const pendingList = pendingSnapshot.docs.map(doc => ({
                 uid: doc.id,
                 ...doc.data()
             }))
+            setPendingUsers(pendingList)
             
-            // Separate into active and pending using the role from the master record
-            setActiveEmployees(list.filter(e => e.role !== 'pending'))
-            setPendingUsers(list.filter(e => e.role === 'pending'))
         } catch (error) {
             console.error('Error fetching employees:', error)
             handleError(error, 'Fetch Employees', 'Failed to fetch employee list')

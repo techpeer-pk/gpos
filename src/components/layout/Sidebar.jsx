@@ -71,8 +71,9 @@ function Sidebar({ isOpen, setIsOpen }) {
                 <div className="px-6 py-4 border-b border-gray-700 dark:border-gray-800">
                     <div className="relative">
                         <button
-                            onClick={() => setShowBranchDropdown(!showBranchDropdown)}
-                            className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-white font-medium transition"
+                            onClick={() => userRole !== 'cashier' && setShowBranchDropdown(!showBranchDropdown)}
+                            disabled={userRole === 'cashier'}
+                            className={`w-full flex items-center justify-between px-3 py-2 bg-gray-800 rounded-lg text-sm text-white font-medium transition ${userRole !== 'cashier' ? 'hover:bg-gray-700 cursor-pointer' : 'cursor-default opacity-90'}`}
                         >
                             <div className="flex items-center gap-2">
                                 <span className="text-lg">🏪</span>
@@ -81,7 +82,9 @@ function Sidebar({ isOpen, setIsOpen }) {
                                     <p className="text-sm font-semibold">{branchName || 'Select Branch'}</p>
                                 </div>
                             </div>
-                            <span className={`text-gray-400 transition ${showBranchDropdown ? 'rotate-180' : ''}`}>▼</span>
+                            {userRole !== 'cashier' && (
+                                <span className={`text-gray-400 transition ${showBranchDropdown ? 'rotate-180' : ''}`}>▼</span>
+                            )}
                         </button>
 
                         {/* Dropdown Menu */}
