@@ -74,6 +74,7 @@ function App() {
         <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
 
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/pending-approval" element={<PendingApproval />} />
         <Route path="/products" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Products /></ProtectedRoute>} />
         <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
         <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />

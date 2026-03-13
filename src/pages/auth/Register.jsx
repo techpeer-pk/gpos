@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { auth, db } from '../../firebase/config'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { MigrationService } from '../../firebase/migration'
 import useAuthStore from '../../store/authStore-multi-branch'
-import { handleError } from '../../utils/errorHandler'
+import { handleError, showSuccess } from '../../utils/errorHandler'
 
 function Register() {
     const [name, setName] = useState('')
@@ -26,37 +26,28 @@ function Register() {
             // Update Auth Profile
             await updateProfile(user, { displayName: name })
 
-            // Create initial business and branch (Fresh Start)
-            console.log('🏗️ Initializing fresh business setup...')
-            const context = await MigrationService.createDefaultBusinessAndBranch(
-                user.uid,
-                `${name}'s Business`,
-                "Main Branch"
-            )
-
-            // Initialize multi-branch auth store
-            const assignedBranches = [
-                {
-                    branchId: context.branchId,
-                    branchName: context.branchName,
-                    role: 'owner'
-                }
-            ]
-
-            useAuthStore.setState({
-                user,
-                businessId: context.businessId,
-                branchId: context.branchId,
-                branchName: context.branchName,
-                assignedBranches,
-                isAuthenticated: true,
-                userId: user.uid,
-                userEmail: user.email,
-                userRole: 'owner'
+            // Create pending user record in Firestore
+            console.log('📝 Creating pending account request...')
+            await setDoc(doc(db, 'users', user.uid), {
+                uid: user.uid,
+                email: email,
+                name: name,
+                role: 'pending',
+                status: 'pending',
+                createdAt: serverTimestamp()
             })
 
-            console.log('✅ Registration & Setup Complete:', context.businessId)
-            navigate('/dashboard')
+            // Update local state to pending
+            useAuthStore.setState({
+                user,
+                userId: user.uid,
+                userEmail: user.email,
+                userRole: 'pending',
+                isAuthenticated: true
+            })
+
+            showSuccess('Registration successful! Awaiting approval.')
+            navigate('/pending-approval')
         } catch (err) {
             handleError(err, 'Register', 'Failed to create account')
             setError(err.message || 'Failed to create account')

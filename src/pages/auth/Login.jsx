@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { auth } from '../../firebase/config'
+import { auth, db } from '../../firebase/config'
 import { signInWithEmailAndPassword } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
 import FirestoreService from '../../firebase/firestore-multi-branch'
 import useAuthStore from '../../store/authStore-multi-branch'
 import { handleError, showSuccess } from '../../utils/errorHandler'
@@ -23,17 +24,32 @@ function Login() {
             const userCredential = await signInWithEmailAndPassword(auth, email, password)
             const user = userCredential.user
 
-            // Get business info
+            // Step 2: Get user profile from global users collection
+            const userDoc = await getDoc(doc(db, 'users', user.uid))
+            const userData = userDoc.exists() ? userDoc.data() : null
+
+            // Step 3: Check for pending status
+            if (userData?.role === 'pending' || userData?.status === 'pending') {
+                useAuthStore.setState({
+                    user,
+                    userId: user.uid,
+                    userEmail: user.email,
+                    userRole: 'pending',
+                    isAuthenticated: true
+                })
+                navigate('/pending-approval')
+                return
+            }
+
+            // Step 4: Get business info
             let context = await MigrationService.getUserBusinessAndBranch(user.uid)
 
             if (!context) {
-                // If no context found, check if it's a new user and create one
-                // Usually this is handled in Register, but let's be safe.
-                context = await MigrationService.createDefaultBusinessAndBranch(
-                    user.uid,
-                    "My Business",
-                    "Main Branch"
-                )
+                // If no business context, and not pending, then something is wrong
+                // or they are an employee without an assignment yet.
+                setError('No business assigned to your account. Please contact your manager.')
+                setLoading(false)
+                return
             }
 
             // Step 5: Store business and branch context
