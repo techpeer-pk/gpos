@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import Layout from '../../components/layout/Layout'
-import { db } from '../../firebase/config'
-import { collection, getDocs, getDoc, orderBy, query, updateDoc, doc, addDoc, serverTimestamp, where, limit } from 'firebase/firestore'
-import useAuthStore from '../../store/authStore'
+import FirestoreService from '../../firebase/firestore-multi-branch'
+import useAuthStore from '../../store/authStore-multi-branch'
 import { handleError, showSuccess } from '../../utils/errorHandler'
 import { generateReceiptMessage, getWhatsAppLink, getSMSLink } from '../../utils/receiptHelper'
+import { serverTimestamp } from 'firebase/firestore'
 
 const ROWS_OPTIONS = [10, 25, 50, 100]
 
@@ -25,16 +25,14 @@ function Sales() {
     const [page, setPage] = useState(1)
     const [rowsPerPage, setRowsPerPage] = useState(25)
     const currency = settings?.currency || 'PKR'
-    const { user } = useAuthStore()
+    const { user, businessId, branchId } = useAuthStore()
 
     const fetchSales = async () => {
         setLoading(true)
         try {
-            const [salesSnap, settingsSnap] = await Promise.all([
-                getDocs(query(collection(db, 'sales'), orderBy('createdAt', 'desc'))),
-                getDoc(doc(db, 'settings', 'global'))
-            ])
-            if (settingsSnap.exists()) setSettings(settingsSnap.data())
+            // Get sales for current branch
+            const salesSnap = await FirestoreService.getSales(businessId, branchId)
+            setSettings({ currency: 'PKR' })
             const list = salesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
             setSales(list)
         } catch (err) {
@@ -46,32 +44,32 @@ function Sales() {
 
     useEffect(() => {
         const init = async () => {
-            await fetchSales()
+            if (businessId && branchId) {
+                await fetchSales()
+            }
             setInitialLoading(false)
         }
         init()
-    }, [])
+    }, [businessId, branchId])
 
     const handleReturn = async (sale) => {
         if (!window.confirm('Are you sure you want to return this entire sale? This will restore items to inventory.')) return
         setLoading(true)
         try {
-            await addDoc(collection(db, 'sales_returns'), {
-                originalSaleId: sale.id,
-                items: sale.items,
-                totalReturned: sale.total,
-                customerId: sale.customerId,
-                customerName: sale.customerName,
-                createdAt: serverTimestamp()
+            // Update sale status
+            await FirestoreService.updateSale(businessId, branchId, sale.id, {
+                status: 'returned',
+                returnedAt: serverTimestamp()
             })
-            await updateDoc(doc(db, 'sales', sale.id), { status: 'returned', returnedAt: serverTimestamp() })
+
+            // Restore inventory for each item
             for (const item of sale.items) {
-                const invQuery = query(collection(db, 'inventory'), where('productId', '==', item.productId), limit(1))
-                const invSnap = await getDocs(invQuery)
-                if (!invSnap.empty) {
+                const invSnap = await FirestoreService.getInventoryByProduct(businessId, branchId, item.productId)
+                if (invSnap.docs.length > 0) {
                     const invDoc = invSnap.docs[0]
-                    await updateDoc(doc(db, 'inventory', invDoc.id), {
-                        currentStock: invDoc.data().currentStock + item.quantity,
+                    const currentQty = invDoc.data().quantity || 0
+                    await FirestoreService.updateInventory(businessId, branchId, invDoc.id, {
+                        quantity: currentQty + item.quantity,
                         lastUpdated: serverTimestamp()
                     })
                 }

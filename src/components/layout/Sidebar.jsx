@@ -5,35 +5,35 @@ import { useState } from 'react'
 import useAuthStore from '../../store/authStore-multi-branch'
 
 const menuItems = [
-    { path: '/dashboard', icon: '📊', label: 'Dashboard', roles: ['admin', 'manager', 'cashier'] },
-    { path: '/pos', icon: '🛒', label: 'POS', roles: ['admin', 'manager', 'cashier'] },
-    { path: '/products', icon: '📦', label: 'Products', roles: ['admin', 'manager'] },
-    { path: '/inventory', icon: '🏪', label: 'Inventory', roles: ['admin', 'manager'] },
-    { path: '/suppliers', icon: '🏭', label: 'Suppliers', roles: ['admin', 'manager'] },
-    { path: '/purchase-orders', icon: '📝', label: 'PO', roles: ['admin', 'manager'] },
-    { path: '/sales', icon: '💰', label: 'Sales', roles: ['admin', 'manager', 'cashier'] },
-    { path: '/customers', icon: '👥', label: 'Customers', roles: ['admin', 'manager', 'cashier'] },
-    { path: '/employees', icon: '👨‍💼', label: 'Employees', roles: ['admin'] },
-    { path: '/reports', icon: '📈', label: 'Reports', roles: ['admin'] },
-    { path: '/settings', icon: '⚙️', label: 'Settings', roles: ['admin'] },
-    { path: '/import', icon: '⬆️', label: 'Import Data', roles: ['admin'] },
-    { path: '/backup', icon: '🗄️', label: 'Backup & Restore', roles: ['admin'] },
-    { path: '/accounts-summary', icon: '📊', label: 'Summary', roles: ['admin', 'manager'] },
-    { path: '/expenses', icon: '💸', label: 'Expenses', roles: ['admin', 'manager'] },
-    { path: '/cash-flow', icon: '🏧', label: 'Cash Flow', roles: ['admin', 'manager'] },
-    { path: '/register-reconciliation', icon: '📝', label: 'Register Close', roles: ['admin', 'manager'] },
-    { path: '/documentation', icon: '📖', label: 'Documentation', roles: ['admin', 'manager', 'cashier'] },
-    { path: '/help', icon: '❓', label: 'Help & Support', roles: ['admin', 'manager', 'cashier'] },
-    { path: '/user-settings', icon: '👤', label: 'Profile', roles: ['admin', 'manager', 'cashier'] },
+    { path: '/dashboard', icon: '📊', label: 'Dashboard', roles: ['owner', 'manager', 'cashier'] },
+    { path: '/pos', icon: '🛒', label: 'POS', roles: ['owner', 'manager', 'cashier'] },
+    { path: '/products', icon: '📦', label: 'Products', roles: ['owner', 'manager'] },
+    { path: '/inventory', icon: '🏪', label: 'Inventory', roles: ['owner', 'manager'] },
+    { path: '/suppliers', icon: '🏭', label: 'Suppliers', roles: ['owner', 'manager'] },
+    { path: '/purchase-orders', icon: '📝', label: 'PO', roles: ['owner', 'manager'] },
+    { path: '/sales', icon: '💰', label: 'Sales', roles: ['owner', 'manager', 'cashier'] },
+    { path: '/customers', icon: '👥', label: 'Customers', roles: ['owner', 'manager', 'cashier'] },
+    { path: '/employees', icon: '👨‍💼', label: 'Employees', roles: ['owner'] },
+    { path: '/reports', icon: '📈', label: 'Reports', roles: ['owner'] },
+    { path: '/settings', icon: '⚙️', label: 'Settings', roles: ['owner'] },
+    { path: '/import', icon: '⬆️', label: 'Import Data', roles: ['owner'] },
+    { path: '/backup', icon: '🗄️', label: 'Backup & Restore', roles: ['owner'] },
+    { path: '/accounts-summary', icon: '📊', label: 'Summary', roles: ['owner', 'manager'] },
+    { path: '/expenses', icon: '💸', label: 'Expenses', roles: ['owner', 'manager'] },
+    { path: '/cash-flow', icon: '🏧', label: 'Cash Flow', roles: ['owner', 'manager'] },
+    { path: '/register-reconciliation', icon: '📝', label: 'Register Close', roles: ['owner', 'manager'] },
+    { path: '/documentation', icon: '📖', label: 'Documentation', roles: ['owner', 'manager', 'cashier'] },
+    { path: '/help', icon: '❓', label: 'Help & Support', roles: ['owner', 'manager', 'cashier'] },
+    { path: '/user-settings', icon: '👤', label: 'Profile', roles: ['owner', 'manager', 'cashier'] },
 ]
 
 function Sidebar({ isOpen, setIsOpen }) {
     const navigate = useNavigate()
-    const { user, branchName, assignedBranches, switchBranch } = useAuthStore()
+    const { userRole, branchName, assignedBranches, switchBranch } = useAuthStore()
     const [showBranchDropdown, setShowBranchDropdown] = useState(false)
 
     const filteredMenu = menuItems.filter(item =>
-        !item.roles || item.roles.includes(user?.role)
+        !item.roles || item.roles.includes(userRole)
     )
 
     const menuGroups = [

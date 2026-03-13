@@ -349,11 +349,12 @@ function POS() {
                     productId: item.id,
                     name: item.name,
                     price: item.price,
-                    costPrice: item.costPrice || 0, // Recorded at time of sale
+                    costPrice: item.costPrice || 0,
                     quantity: item.quantity,
                     total: item.price * item.quantity
                 })),
-                subtotal, tax, total,
+                subtotal, tax, 
+                finalAmount: total,
                 currency,
                 taxLabel: settings?.taxLabel || 'Tax',
                 discount: redeemPoints ? redemptionValue : 0,
@@ -365,38 +366,57 @@ function POS() {
                 customerId: selectedCustomer?.id || 'walk-in',
                 customerName: selectedCustomer?.name || 'Walk-in Customer',
                 customerPhone: selectedCustomer?.phone || '',
-                status: 'completed', createdAt: serverTimestamp()
+                status: 'completed',
+                createdAt: serverTimestamp()
             }
-            const newSalePromise = addDoc(collection(db, 'sales'), saleData)
+
+            // Add sale using new API
+            const newSale = await FirestoreService.addSale(businessId, branchId, saleData)
+
+            // Update customer loyalty points
             if (selectedCustomer && selectedCustomer.id !== 'walk-in') {
                 const earnedPoints = Math.floor((total / 100) * (settings?.loyaltyPointsPerAmount || 1))
-                updateDoc(doc(db, 'customers', selectedCustomer.id), {
-                    totalSpent: increment(total),
-                    loyaltyPoints: increment(earnedPoints - (redeemPoints ? selectedCustomer.loyaltyPoints : 0)),
-                    totalVisits: increment(1), lastVisit: serverTimestamp()
+                const pointsToDeduct = redeemPoints ? selectedCustomer.loyaltyPoints : 0
+                await FirestoreService.updateCustomer(businessId, selectedCustomer.id, {
+                    totalSpent: (selectedCustomer.totalSpent || 0) + total,
+                    loyaltyPoints: (selectedCustomer.loyaltyPoints || 0) + earnedPoints - pointsToDeduct,
+                    totalVisits: (selectedCustomer.totalVisits || 0) + 1,
+                    lastVisit: serverTimestamp()
                 })
             }
+
+            // Update inventory for each item
             for (const item of cart) {
-                const invQuery = query(collection(db, 'inventory'), where('productId', '==', item.id), limit(1))
-                getDocs(invQuery).then(invSnap => {
-                    if (!invSnap.empty) updateDoc(doc(db, 'inventory', invSnap.docs[0].id), { currentStock: increment(-item.quantity), lastUpdated: serverTimestamp() })
-                })
+                const invSnap = await FirestoreService.getInventoryByProduct(businessId, branchId, item.id)
+                if (invSnap.docs.length > 0) {
+                    const invDoc = invSnap.docs[0]
+                    const currentQty = invDoc.data().quantity || 0
+                    await FirestoreService.updateInventory(businessId, branchId, invDoc.id, {
+                        quantity: Math.max(0, currentQty - item.quantity),
+                        lastUpdated: serverTimestamp()
+                    })
+                }
             }
-            const newSale = await newSalePromise
+
             const finalSaleData = { id: newSale.id, ...saleData }
 
-            // Auto-sync to Cash Flow if payment is cash
+            // Add to cash flow if cash payment
             if (paymentMethod === 'cash') {
-                addDoc(collection(db, 'cash_flow'), {
-                    type: 'in',
-                    category: 'Sales',
-                    amount: total,
-                    reason: `POS Sale (Auto-sync) #${newSale.id.slice(-6)}`,
-                    date: new Date().toISOString().split('T')[0],
-                    createdAt: serverTimestamp(),
-                    saleId: newSale.id
-                }).catch(err => console.error('Cash Flow Sync Failed:', err))
+                try {
+                    await FirestoreService.addCashFlow(businessId, branchId, {
+                        type: 'in',
+                        category: 'Sales',
+                        amount: total,
+                        reason: `POS Sale (Auto-sync) #${newSale.id.slice(-6)}`,
+                        date: new Date().toISOString().split('T')[0],
+                        createdAt: serverTimestamp(),
+                        saleId: newSale.id
+                    })
+                } catch (err) {
+                    console.error('Cash Flow Sync Failed:', err)
+                }
             }
+
             setCart([])
             setAmountPaid('')
             setSelectedCustomer(null)
@@ -418,9 +438,13 @@ function POS() {
         if (cart.length === 0) return alert('Cart is empty!')
         setLoading(true)
         try {
-            await addDoc(collection(db, 'suspended_sales'), {
-                items: cart, subtotal, tax, taxLabel: settings?.taxLabel || 'Tax',
-                discount: redemptionValue, total, currency,
+            await FirestoreService.addSuspendedSale(businessId, branchId, {
+                items: cart,
+                subtotal, tax,
+                taxLabel: settings?.taxLabel || 'Tax',
+                discount: redemptionValue,
+                total,
+                currency,
                 customerId: selectedCustomer?.id || 'walk-in',
                 customerName: selectedCustomer?.name || 'Walk-in Customer',
                 cashierId: auth.currentUser?.uid,
@@ -432,11 +456,14 @@ function POS() {
             setRedeemPoints(false)
             setMobileCartOpen(false)
             setAmountPaid('')
-            const snapshot = await getDocs(collection(db, 'suspended_sales'))
+            
+            // Refresh suspended sales list
+            const snapshot = await FirestoreService.getSuspendedSales(businessId, branchId)
             setSuspendedSales(snapshot.docs.map(d => ({ id: d.id, ...d.data() })))
             alert('Sale suspended successfully!')
         } catch (err) {
             console.error(err)
+            handleError(err, 'Hold Sale', 'Failed to suspend sale')
         } finally {
             setLoading(false)
         }

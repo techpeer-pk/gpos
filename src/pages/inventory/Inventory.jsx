@@ -1,16 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import Layout from '../../components/layout/Layout'
-import { db } from '../../firebase/config'
-import {
-    collection,
-    getDocs,
-    addDoc,
-    updateDoc,
-    doc,
-    serverTimestamp
-} from 'firebase/firestore'
+import FirestoreService from '../../firebase/firestore-multi-branch'
+import useAuthStore from '../../store/authStore-multi-branch'
+import { serverTimestamp } from 'firebase/firestore'
 
 function Inventory() {
+    const { businessId, branchId } = useAuthStore()
     const [inventory, setInventory] = useState([])
     const [products, setProducts] = useState([])
     const [categories, setCategories] = useState([])
@@ -18,9 +13,8 @@ function Inventory() {
     const [loading, setLoading] = useState(false)
     const [form, setForm] = useState({
         productId: '',
-        currentStock: '',
-        minStock: '',
-        maxStock: '',
+        quantity: '',
+        reorderLevel: '',
     })
 
     const [initialLoading, setInitialLoading] = useState(true)
@@ -34,53 +28,58 @@ function Inventory() {
     // ── Bulk Restock ─────────────────────────────────────────
     const [showBulk, setShowBulk] = useState(false)
     const [bulkSearch, setBulkSearch] = useState('')
-    const [bulkChanges, setBulkChanges] = useState({})   // { [invId]: { mode: 'add'|'set', value: number } }
+    const [bulkChanges, setBulkChanges] = useState({})
     const [bulkLoading, setBulkLoading] = useState(false)
     // ─────────────────────────────────────────────────────────
 
     const fetchData = async () => {
-        const [productSnap, inventorySnap, categorySnap] = await Promise.all([
-            getDocs(collection(db, 'products')),
-            getDocs(collection(db, 'inventory')),
-            getDocs(collection(db, 'categories')),
-        ])
+        try {
+            const [productSnap, inventorySnap, categorySnap] = await Promise.all([
+                FirestoreService.getProducts(businessId),
+                FirestoreService.getInventory(businessId, branchId),
+                FirestoreService.getCategories(businessId),
+            ])
 
-        const productList = productSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        const inventoryList = inventorySnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        const categoryList = categorySnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            const productList = productSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            const inventoryList = inventorySnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            const categoryList = categorySnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
 
-        setProducts(productList)
-        setCategories(categoryList)
+            setProducts(productList)
+            setCategories(categoryList)
 
-        // Auto-create missing inventory records for imported products
-        const inventoryProductIds = new Set(inventoryList.map(i => i.productId))
-        const missing = productList.filter(p => !inventoryProductIds.has(p.id))
-        if (missing.length > 0) {
-            await Promise.all(missing.map(p =>
-                addDoc(collection(db, 'inventory'), {
-                    productId: p.id,
-                    currentStock: 0,
-                    minStock: 10,
-                    maxStock: 100,
-                    lastUpdated: serverTimestamp()
-                })
-            ))
-            // Refetch after creating missing records
-            const freshSnap = await getDocs(collection(db, 'inventory'))
-            const freshList = freshSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-            setInventory(freshList)
-        } else {
-            setInventory(inventoryList)
+            // Auto-create missing inventory records for products
+            const inventoryProductIds = new Set(inventoryList.map(i => i.productId))
+            const missing = productList.filter(p => !inventoryProductIds.has(p.id))
+            if (missing.length > 0) {
+                await Promise.all(missing.map(p =>
+                    FirestoreService.addInventory(businessId, branchId, p.id, {
+                        productId: p.id,
+                        quantity: 0,
+                        reorderLevel: 10,
+                        lastRestocked: serverTimestamp()
+                    })
+                ))
+                // Refetch after creating missing records
+                const freshSnap = await FirestoreService.getInventory(businessId, branchId)
+                const freshList = freshSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                setInventory(freshList)
+            } else {
+                setInventory(inventoryList)
+            }
+        } catch (err) {
+            console.error('Inventory fetch error:', err)
         }
     }
 
     useEffect(() => {
         const init = async () => {
-            await fetchData()
+            if (businessId && branchId) {
+                await fetchData()
+            }
             setInitialLoading(false)
         }
         init()
-    }, [])
+    }, [businessId, branchId])
 
     const getProductName = (productId) => {
         const product = products.find(p => p.id === productId)
@@ -108,14 +107,13 @@ function Inventory() {
         e.preventDefault()
         setLoading(true)
         try {
-            await addDoc(collection(db, 'inventory'), {
+            await FirestoreService.addInventory(businessId, branchId, form.productId, {
                 productId: form.productId,
-                currentStock: parseInt(form.currentStock),
-                minStock: parseInt(form.minStock),
-                maxStock: parseInt(form.maxStock),
-                lastUpdated: serverTimestamp()
+                quantity: parseInt(form.quantity),
+                reorderLevel: parseInt(form.reorderLevel),
+                lastRestocked: serverTimestamp()
             })
-            setForm({ productId: '', currentStock: '', minStock: '', maxStock: '' })
+            setForm({ productId: '', quantity: '', reorderLevel: '' })
             setShowForm(false)
             fetchData()
         } catch (err) {
@@ -126,15 +124,15 @@ function Inventory() {
     }
 
     const handleStockUpdate = async (id, newStock) => {
-        await updateDoc(doc(db, 'inventory', id), {
-            currentStock: parseInt(newStock),
+        await FirestoreService.updateInventory(businessId, branchId, id, {
+            quantity: parseInt(newStock),
             lastUpdated: serverTimestamp()
         })
         fetchData()
     }
 
-    const lowStockCount = inventory.filter(i => i.currentStock <= i.minStock).length
-    const outOfStockCount = inventory.filter(i => i.currentStock <= 0).length
+    const lowStockCount = inventory.filter(i => i.quantity <= i.reorderLevel).length
+    const outOfStockCount = inventory.filter(i => i.quantity <= 0).length
 
     // ── Bulk Restock Handlers ─────────────────────────────────
     const openBulkModal = () => {
@@ -160,10 +158,10 @@ function Inventory() {
                 if (!item) return Promise.resolve()
                 const parsed = parseInt(change.value) || 0
                 const newStock = change.mode === 'add'
-                    ? Math.max(0, item.currentStock + parsed)
+                    ? Math.max(0, item.quantity + parsed)
                     : Math.max(0, parsed)
-                return updateDoc(doc(db, 'inventory', invId), {
-                    currentStock: newStock,
+                return FirestoreService.updateInventory(businessId, branchId, invId, {
+                    quantity: newStock,
                     lastUpdated: serverTimestamp()
                 })
             }))
