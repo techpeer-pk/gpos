@@ -10,12 +10,15 @@ import {
     setDoc,
     doc,
     deleteDoc,
-    serverTimestamp
+    serverTimestamp,
+    query,
+    where
 } from 'firebase/firestore'
 
 function Employees() {
     const { businessId } = useAuthStore()
-    const [employees, setEmployees] = useState([])
+    const [pendingUsers, setPendingUsers] = useState([])
+    const [activeEmployees, setActiveEmployees] = useState([])
     const [showForm, setShowForm] = useState(false)
     const [loading, setLoading] = useState(false)
     const [form, setForm] = useState({
@@ -26,7 +29,23 @@ function Employees() {
         assignedBranches: []
     })
 
-    const fetchEmployees = async () => {
+    // Fetch pending users from pending_users collection
+    const fetchPendingUsers = async () => {
+        try {
+            const snapshot = await getDocs(collection(db, 'pending_users'))
+            const list = snapshot.docs.map(doc => ({
+                uid: doc.id,
+                ...doc.data()
+            }))
+            setPendingUsers(list)
+        } catch (error) {
+            console.error('Error fetching pending users:', error)
+            handleError(error, 'Fetch Pending Users', 'Failed to fetch pending users')
+        }
+    }
+
+    // Fetch approved employees from business_users
+    const fetchApprovedEmployees = async () => {
         if (!businessId) return
         try {
             const snapshot = await getDocs(collection(db, 'business_users', businessId))
@@ -37,18 +56,69 @@ function Employees() {
                     list.push({ uid: userDoc.id, ...profileDoc.data() })
                 })
             }
-            setEmployees(list)
+            setActiveEmployees(list)
         } catch (error) {
-            console.error('Error fetching employees:', error)
+            console.error('Error fetching approved employees:', error)
             handleError(error, 'Fetch Employees', 'Failed to fetch employee list')
         }
     }
 
     useEffect(() => {
+        fetchPendingUsers()
         if (businessId) {
-            fetchEmployees()
+            fetchApprovedEmployees()
         }
     }, [businessId])
+
+    // Approve pending user - move to business_users
+    const handleApprove = async (uid, name, email) => {
+        setLoading(true)
+        try {
+            if (!businessId) {
+                handleError(null, 'Approve', 'No business context found')
+                setLoading(false)
+                return
+            }
+
+            // Create user in business_users as approved employee
+            await setDoc(doc(db, 'business_users', businessId, uid, 'profile'), {
+                uid,
+                name,
+                email,
+                role: 'cashier',  // Default role
+                assignedBranches: [],
+                createdAt: serverTimestamp()
+            })
+
+            // Remove from pending_users
+            await deleteDoc(doc(db, 'pending_users', uid))
+
+            showSuccess(`✅ ${name} approved and added to team!`)
+            await fetchPendingUsers()
+            await fetchApprovedEmployees()
+        } catch (err) {
+            handleError(err, 'Approve User', 'Failed to approve user')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // Reject pending user
+    const handleRejectPending = async (uid, name) => {
+        if (!window.confirm(`Reject ${name}? They will need to register again.`)) {
+            return
+        }
+        try {
+            setLoading(true)
+            await deleteDoc(doc(db, 'pending_users', uid))
+            showSuccess(`❌ ${name} rejected`)
+            await fetchPendingUsers()
+        } catch (err) {
+            handleError(err, 'Reject User', 'Failed to reject user')
+        } finally {
+            setLoading(false)
+        }
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -72,7 +142,7 @@ function Employees() {
             setForm({ uid: '', name: '', email: '', role: 'cashier', assignedBranches: [] })
             setShowForm(false)
             showSuccess('Employee saved successfully')
-            fetchEmployees()
+            fetchApprovedEmployees()
         } catch (err) {
             handleError(err, 'Save Employee', 'Failed to save employee')
         } finally {
@@ -80,15 +150,19 @@ function Employees() {
         }
     }
 
-    const handleDelete = async (uid) => {
-        if (window.confirm('Remove this employee?')) {
-            try {
-                await deleteDoc(doc(db, 'business_users', businessId, uid, 'profile'))
-                fetchEmployees()
-                showSuccess('Employee removed')
-            } catch (err) {
-                handleError(err, 'Delete Employee', 'Failed to remove employee')
-            }
+    const handleDelete = async (uid, name) => {
+        if (!window.confirm(`Remove ${name} from team?`)) {
+            return
+        }
+        try {
+            setLoading(true)
+            await deleteDoc(doc(db, 'business_users', businessId, uid, 'profile'))
+            fetchApprovedEmployees()
+            showSuccess('Employee removed')
+        } catch (err) {
+            handleError(err, 'Delete Employee', 'Failed to remove employee')
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -126,24 +200,23 @@ function Employees() {
                             <tbody className="divide-y divide-yellow-100">
                                 {pendingUsers.map((user) => (
                                     <tr key={user.uid} className="hover:bg-yellow-100/30">
-                                        <td className="px-6 py-4 font-medium text-gray-800">{user.name}</td>
+                                        <td className="px-6 py-4 font-medium text-gray-800">{user.name || user.displayName}</td>
                                         <td className="px-6 py-4 text-gray-600">{user.email}</td>
                                         <td className="px-6 py-4">
                                             <div className="flex gap-3">
                                                 <button
-                                                    onClick={() => {
-                                                        setForm({ uid: user.uid, name: user.name, email: user.email, role: 'cashier' })
-                                                        setShowForm(true)
-                                                    }}
-                                                    className="bg-blue-600 text-white px-3 py-1 rounded shadow-sm hover:bg-blue-700 transition"
+                                                    onClick={() => handleApprove(user.uid, user.name || user.displayName, user.email)}
+                                                    disabled={loading}
+                                                    className="bg-green-600 text-white px-3 py-1 rounded shadow-sm hover:bg-green-700 transition disabled:opacity-50"
                                                 >
-                                                    Approve
+                                                    ✅ Approve
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDelete(user.uid)}
-                                                    className="text-red-600 hover:text-red-800 font-medium"
+                                                    onClick={() => handleRejectPending(user.uid, user.name || user.displayName)}
+                                                    disabled={loading}
+                                                    className="text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
                                                 >
-                                                    Reject
+                                                    ❌ Reject
                                                 </button>
                                             </div>
                                         </td>

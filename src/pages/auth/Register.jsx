@@ -24,9 +24,16 @@ function Register() {
             // Update Auth Profile
             await updateProfile(user, { displayName: name })
 
-            // Note: User profile will be created in business_users collection
-            // when the business owner assigns them to a branch
-            // (See Employees.jsx for user assignment flow)
+            // Create pending user record in pending_users collection
+            // Owner must approve before user can access the system
+            await setDoc(doc(db, 'pending_users', user.uid), {
+                uid: user.uid,
+                name,
+                email,
+                displayName: name,
+                createdAt: serverTimestamp(),
+                status: 'pending'
+            })
 
             navigate('/pending')
         } catch (err) {
