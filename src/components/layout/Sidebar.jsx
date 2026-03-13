@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { logout } from '../../firebase/auth'
 import { useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import useAuthStore from '../../store/authStore'
+import useAuthStore from '../../store/authStore-multi-branch'
 
 const menuItems = [
     { path: '/dashboard', icon: '📊', label: 'Dashboard', roles: ['admin', 'manager', 'cashier'] },
@@ -29,7 +29,8 @@ const menuItems = [
 
 function Sidebar({ isOpen, setIsOpen }) {
     const navigate = useNavigate()
-    const { user } = useAuthStore()
+    const { user, branchName, assignedBranches, switchBranch } = useAuthStore()
+    const [showBranchDropdown, setShowBranchDropdown] = useState(false)
 
     const filteredMenu = menuItems.filter(item =>
         !item.roles || item.roles.includes(user?.role)
@@ -64,6 +65,45 @@ function Sidebar({ isOpen, setIsOpen }) {
                 <p className="text-gray-400 text-xs mt-1">General Point of Sale</p>
             </div>
 
+            {/* Branch Selector */}
+            {assignedBranches && assignedBranches.length > 0 && (
+                <div className="px-6 py-4 border-b border-gray-700 dark:border-gray-800">
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowBranchDropdown(!showBranchDropdown)}
+                            className="w-full flex items-center justify-between px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm text-white font-medium transition"
+                        >
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">🏪</span>
+                                <div className="text-left">
+                                    <p className="text-xs text-gray-400">Branch</p>
+                                    <p className="text-sm font-semibold">{branchName || 'Select Branch'}</p>
+                                </div>
+                            </div>
+                            <span className={`text-gray-400 transition ${showBranchDropdown ? 'rotate-180' : ''}`}>▼</span>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {showBranchDropdown && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-50">
+                                {assignedBranches.map((branch) => (
+                                    <button
+                                        key={branch.branchId}
+                                        onClick={() => {
+                                            switchBranch(branch.branchId, branch.branchName)
+                                            setShowBranchDropdown(false)
+                                        }}
+                                        className="w-full px-4 py-3 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition first:rounded-t-lg last:rounded-b-lg"
+                                    >
+                                        <span className="mr-2">🏪</span>
+                                        {branch.branchName}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
             {/* Menu (grouped) */}
             <nav className="flex-1 p-4 space-y-4 overflow-y-auto">
                 {menuGroups.map((group) => {

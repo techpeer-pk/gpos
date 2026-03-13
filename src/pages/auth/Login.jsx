@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { login } from '../../firebase/auth'
+import { MigrationService } from '../../firebase/migration'
+import useAuthStore from '../../store/authStore-multi-branch'
 
 function Login() {
     const [email, setEmail] = useState('')
@@ -14,10 +16,60 @@ function Login() {
         setError('')
         setLoading(true)
         try {
-            await login(email, password)
+            // Step 1: Authenticate with Firebase
+            const userCredential = await login(email, password)
+            const user = userCredential.user
+
+            // Step 2: Check if user already has a business
+            let context = await MigrationService.getUserBusinessAndBranch(user.uid)
+
+            // Step 3: If no business exists, create default one
+            if (!context) {
+                try {
+                    context = await MigrationService.createDefaultBusinessAndBranch(
+                        user.uid,
+                        "My Business",      // Default business name
+                        "Main Branch"       // Default branch name
+                    )
+                    console.log('✅ Created new business and branch:', context)
+                } catch (createError) {
+                    console.error('❌ Error creating business/branch:', createError)
+                    throw new Error('Failed to initialize business setup')
+                }
+            }
+
+            // Step 4: Store business and branch context
+            const assignedBranches = context.branches?.map(branch => ({
+                branchId: branch.branchId,
+                branchName: branch.branchName,
+                role: 'owner'
+            })) || [
+                {
+                    branchId: context.branchId,
+                    branchName: context.branchName || "Main Branch",
+                    role: 'owner'
+                }
+            ]
+
+            useAuthStore.setState({
+                user,
+                businessId: context.businessId,
+                branchId: context.branchId,
+                branchName: context.branchName || "Main Branch",
+                assignedBranches,
+                isAuthenticated: true,
+                userId: user.uid,
+                userEmail: user.email,
+                userRole: 'owner'
+            })
+
+            console.log('✅ Login successful. Business:', context.businessId, 'Branch:', context.branchId)
+
+            // Step 5: Navigate to dashboard
             navigate('/dashboard')
-        } catch {
-            setError('Invalid email or password')
+        } catch (err) {
+            console.error('❌ Login error:', err)
+            setError(err.message || 'Invalid email or password')
         } finally {
             setLoading(false)
         }

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/layout/Layout'
-import { db } from '../../firebase/config'
+import FirestoreService from '../../firebase/firestore-multi-branch'
+import useAuthStore from '../../store/authStore-multi-branch'
 import { handleError } from '../../utils/errorHandler'
-import { collection, getDocs, getDoc, query, where, Timestamp, doc } from 'firebase/firestore'
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, PieChart, Pie, Cell
@@ -11,6 +11,7 @@ import {
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
 function Dashboard() {
+    const { businessId, branchId, branchName } = useAuthStore()
     const [stats, setStats] = useState({
         todaySales: 0,
         yesterdaySales: 0,
@@ -25,9 +26,8 @@ function Dashboard() {
         allSales: [],
         loading: true
     })
-    const [settings, setSettings] = useState(null)
     const [chartRange, setChartRange] = useState('weekly')
-    const currency = settings?.currency || 'PKR'
+    const currency = 'PKR'
 
     const buildChartData = (sales, range) => {
         const now = new Date()
@@ -73,14 +73,12 @@ function Dashboard() {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const settingsSnap = await getDoc(doc(db, 'settings', 'global'))
-                if (settingsSnap.exists()) setSettings(settingsSnap.data())
-
+                // Get all collections using new multi-branch API
                 const [productsSnap, customersSnap, inventorySnap, allSalesSnap] = await Promise.all([
-                    getDocs(collection(db, 'products')),
-                    getDocs(collection(db, 'customers')),
-                    getDocs(collection(db, 'inventory')),
-                    getDocs(collection(db, 'sales'))
+                    FirestoreService.getProducts(businessId),
+                    FirestoreService.getCustomers(businessId),
+                    FirestoreService.getInventory(businessId, branchId),
+                    FirestoreService.getSales(businessId, branchId)
                 ])
 
                 const inventoryList = inventorySnap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -88,21 +86,24 @@ function Dashboard() {
 
                 // Today / Yesterday
                 const now = new Date()
-                const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0)
-                const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1)
+                const todayStart = new Date(now)
+                todayStart.setHours(0, 0, 0, 0)
+                const yesterdayStart = new Date(todayStart)
+                yesterdayStart.setDate(yesterdayStart.getDate() - 1)
                 const yesterdayEnd = new Date(todayStart)
 
-                const todayQuery = query(collection(db, 'sales'), where('createdAt', '>=', Timestamp.fromDate(todayStart)))
-                const todaySnap = await getDocs(todayQuery)
-                const tSales = todaySnap.docs.reduce((sum, d) => sum + d.data().total, 0)
+                // Filter sales for today and yesterday
+                const todaySales = allSales.filter(s => {
+                    const t = s.createdAt?.toDate?.() || new Date(s.createdAt)
+                    return t >= todayStart && t <= now
+                })
+                const yesterdaySales = allSales.filter(s => {
+                    const t = s.createdAt?.toDate?.() || new Date(s.createdAt)
+                    return t >= yesterdayStart && t < todayStart
+                })
 
-                const yesterdayQuery = query(
-                    collection(db, 'sales'),
-                    where('createdAt', '>=', Timestamp.fromDate(yesterdayStart)),
-                    where('createdAt', '<', Timestamp.fromDate(yesterdayEnd))
-                )
-                const yesterdaySnap = await getDocs(yesterdayQuery)
-                const ySales = yesterdaySnap.docs.reduce((sum, d) => sum + d.data().total, 0)
+                const tSales = todaySales.reduce((sum, d) => sum + (d.finalAmount || d.total || 0), 0)
+                const ySales = yesterdaySales.reduce((sum, d) => sum + (d.finalAmount || d.total || 0), 0)
 
                 // Top Products
                 const productSalesMap = {}
@@ -120,7 +121,7 @@ function Dashboard() {
                 allSales.forEach(sale => {
                     const method = sale.paymentMethod || 'cash'
                     if (!paymentMap[method]) paymentMap[method] = 0
-                    paymentMap[method] += sale.total
+                    paymentMap[method] += sale.finalAmount || sale.total || 0
                 })
                 const paymentBreakdown = Object.entries(paymentMap).map(([name, value]) => ({
                     name: name.charAt(0).toUpperCase() + name.slice(1),
@@ -132,15 +133,15 @@ function Dashboard() {
                     .map(d => {
                         const p = { id: d.id, ...d.data() }
                         const inv = inventoryList.find(i => i.productId === p.id)
-                        return { ...p, currentStock: inv?.currentStock || 0, minStock: inv?.minStock || 10 }
+                        return { ...p, currentStock: inv?.quantity || 0, minStock: inv?.reorderLevel || 10 }
                     })
                     .filter(p => p.currentStock <= p.minStock)
 
                 setStats({
                     todaySales: tSales,
                     yesterdaySales: ySales,
-                    todayTransactions: todaySnap.size,
-                    yesterdayTransactions: yesterdaySnap.size,
+                    todayTransactions: todaySales.length,
+                    yesterdayTransactions: yesterdaySales.length,
                     totalProducts: productsSnap.size,
                     totalCustomers: customersSnap.size,
                     lowStockItems,
@@ -151,12 +152,16 @@ function Dashboard() {
                     loading: false
                 })
             } catch (err) {
+                console.error('Dashboard error:', err)
                 handleError(err, 'Dashboard Stats', 'Failed to load dashboard data')
                 setStats(prev => ({ ...prev, loading: false }))
             }
         }
-        fetchStats()
-    }, [])
+        
+        if (businessId && branchId) {
+            fetchStats()
+        }
+    }, [businessId, branchId])
 
     const handleChartRange = (range) => {
         setChartRange(range)
@@ -185,6 +190,17 @@ function Dashboard() {
     return (
         <Layout title="Dashboard">
             <div className="mt-12 space-y-6">
+
+                {/* ── Business & Branch Context ── */}
+                <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 shadow-lg text-white">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-blue-100 text-sm font-semibold uppercase tracking-widest">Current Branch</p>
+                            <h2 className="text-3xl font-black mt-2">🏪 {branchName}</h2>
+                        </div>
+                        <span className="text-5xl opacity-30">📊</span>
+                    </div>
+                </div>
 
                 {/* ── Stat Cards ── */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

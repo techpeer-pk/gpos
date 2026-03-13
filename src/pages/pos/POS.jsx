@@ -1,24 +1,11 @@
 import { useState, useEffect, memo } from 'react'
 import Layout from '../../components/layout/Layout'
-import { db, auth } from '../../firebase/config'
+import { auth } from '../../firebase/config'
+import FirestoreService from '../../firebase/firestore-multi-branch'
+import useAuthStore from '../../store/authStore-multi-branch'
 import { handleError, showSuccess } from '../../utils/errorHandler'
-import {
-    collection,
-    getDocs,
-    getDoc,
-    addDoc,
-    updateDoc,
-    doc,
-    deleteDoc,
-    increment,
-    serverTimestamp,
-    where,
-    limit,
-    query
-} from 'firebase/firestore'
-
+import { serverTimestamp } from 'firebase/firestore'
 import { generateReceiptMessage, getWhatsAppLink, getSMSLink } from '../../utils/receiptHelper'
-import useAuthStore from '../../store/authStore'
 
 // ─── Cart Panel — defined OUTSIDE POS so it never remounts on parent re-render
 const CartPanel = memo(({
@@ -226,7 +213,7 @@ function POS() {
     const [lastSaleData, setLastSaleData] = useState(null)
     const [mobileCartOpen, setMobileCartOpen] = useState(false)
     const [barcodeFlash, setBarcodeFlash] = useState(false)
-    const { user } = useAuthStore()
+    const { user, businessId, branchId } = useAuthStore()
 
     const [amountPaid, setAmountPaid] = useState('')
 
@@ -244,24 +231,28 @@ function POS() {
     useEffect(() => {
         const fetchInitial = async () => {
             try {
+                // Use new multi-branch API
                 const [productSnap, inventorySnap, categorySnap, customerSnap] = await Promise.all([
-                    getDocs(collection(db, 'products')),
-                    getDocs(collection(db, 'inventory')),
-                    getDocs(collection(db, 'categories')),
-                    getDocs(collection(db, 'customers')),
+                    FirestoreService.getProducts(businessId),
+                    FirestoreService.getInventory(businessId, branchId),
+                    FirestoreService.getCategories(businessId),
+                    FirestoreService.getCustomers(businessId),
                 ])
                 const inventoryList = inventorySnap.docs.map(d => ({ id: d.id, ...d.data() }))
                 const categoryList = categorySnap.docs.map(d => ({ id: d.id, ...d.data() }))
                 setProducts(productSnap.docs.map(d => {
                     const p = { id: d.id, ...d.data() }
                     const inv = inventoryList.find(i => i.productId === p.id)
-                    return { ...p, stock: inv?.currentStock ?? null }
+                    return { ...p, stock: inv?.quantity ?? null }
                 }))
                 setCategories(categoryList)
                 setCustomers(customerSnap.docs.map(d => ({ id: d.id, ...d.data() })))
-                const settingsSnap = await getDoc(doc(db, 'settings', 'global'))
-                if (settingsSnap.exists()) setSettings(settingsSnap.data())
-                const suspSnap = await getDocs(collection(db, 'suspended_sales'))
+                
+                // Set default settings (no global settings collection in new structure)
+                setSettings({ currency: 'PKR', taxLabel: 'Tax', loyaltyPointsPerAmount: 1 })
+                
+                // Get suspended sales for this branch
+                const suspSnap = await FirestoreService.getSuspendedSales(businessId, branchId)
                 setSuspendedSales(suspSnap.docs.map(d => ({ id: d.id, ...d.data() })))
             } catch (err) {
                 console.error('POS fetch error:', err)
@@ -269,8 +260,11 @@ function POS() {
                 setInitialLoading(false)
             }
         }
-        fetchInitial()
-    }, [])
+        
+        if (businessId && branchId) {
+            fetchInitial()
+        }
+    }, [businessId, branchId])
 
     if (initialLoading) {
         return (
