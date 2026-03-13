@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { login } from '../../firebase/auth'
-import { MigrationService } from '../../firebase/migration'
+import { auth } from '../../firebase/config'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import FirestoreService from '../../firebase/firestore-multi-branch'
 import useAuthStore from '../../store/authStore-multi-branch'
-import { db } from '../../firebase/config'
-import { doc, getDoc } from 'firebase/firestore'
+import { handleError, showSuccess } from '../../utils/errorHandler'
+import { MigrationService } from '../../firebase/migration'
 
 function Login() {
     const [email, setEmail] = useState('')
@@ -19,37 +20,20 @@ function Login() {
         setLoading(true)
         try {
             // Step 1: Authenticate with Firebase
-            const userCredential = await login(email, password)
+            const userCredential = await signInWithEmailAndPassword(auth, email, password)
             const user = userCredential.user
 
-            // Step 2: Check if user is still pending approval
-            try {
-                const pendingDoc = await getDoc(doc(db, 'pending_users', user.uid))
-                if (pendingDoc.exists()) {
-                    console.log('⏳ User is pending approval')
-                    navigate('/pending')
-                    return
-                }
-            } catch (err) {
-                console.warn('Could not check pending status:', err)
-            }
-
-            // Step 3: Check if user already has a business
+            // Get business info
             let context = await MigrationService.getUserBusinessAndBranch(user.uid)
 
-            // Step 4: If no business exists, create default one
             if (!context) {
-                try {
-                    context = await MigrationService.createDefaultBusinessAndBranch(
-                        user.uid,
-                        "My Business",      // Default business name
-                        "Main Branch"       // Default branch name
-                    )
-                    console.log('✅ Created new business and branch:', context)
-                } catch (createError) {
-                    console.error('❌ Error creating business/branch:', createError)
-                    throw new Error('Failed to initialize business setup')
-                }
+                // If no context found, check if it's a new user and create one
+                // Usually this is handled in Register, but let's be safe.
+                context = await MigrationService.createDefaultBusinessAndBranch(
+                    user.uid,
+                    "My Business",
+                    "Main Branch"
+                )
             }
 
             // Step 5: Store business and branch context
@@ -79,7 +63,7 @@ function Login() {
 
             console.log('✅ Login successful. Business:', context.businessId, 'Branch:', context.branchId)
 
-            // Step 6: Navigate to dashboard
+            showSuccess('Logged in successfully')
             navigate('/dashboard')
         } catch (err) {
             console.error('❌ Login error:', err)

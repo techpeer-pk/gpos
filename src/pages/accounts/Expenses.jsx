@@ -24,7 +24,12 @@ const CATEGORIES = [
     'Other'
 ]
 
+import useAuthStore from '../../store/authStore-multi-branch'
+import FirestoreService from '../../firebase/firestore-multi-branch'
+import { handleError, showSuccess } from '../../utils/errorHandler'
+
 function Expenses() {
+    const { businessId, branchId } = useAuthStore()
     const [expenses, setExpenses] = useState([])
     const [loading, setLoading] = useState(false)
     const [initialLoading, setInitialLoading] = useState(true)
@@ -42,28 +47,27 @@ function Expenses() {
     })
 
     const fetchExpenses = async () => {
+        if (!businessId || !branchId) return
         try {
-            const q = query(collection(db, 'expenses'), orderBy('date', 'desc'))
-            const snapshot = await getDocs(q)
+            const snapshot = await FirestoreService.getExpenses(businessId, branchId)
             setExpenses(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Fetch Expenses', 'Failed to load expense records')
         }
     }
 
     useEffect(() => {
-        const init = async () => {
-            await fetchExpenses()
+        if (businessId && branchId) {
+            fetchExpenses()
             setInitialLoading(false)
         }
-        init()
-    }, [])
+    }, [businessId, branchId])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
         setLoading(true)
         try {
-            await addDoc(collection(db, 'expenses'), {
+            await FirestoreService.addExpense(businessId, branchId, {
                 ...form,
                 amount: parseFloat(form.amount),
                 createdAt: serverTimestamp()
@@ -76,9 +80,10 @@ function Expenses() {
                 notes: ''
             })
             setShowForm(false)
+            showSuccess('Expense recorded successfully')
             fetchExpenses()
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Add Expense', 'Failed to record expense')
         } finally {
             setLoading(false)
         }
@@ -88,16 +93,16 @@ function Expenses() {
         e.preventDefault()
         setLoading(true)
         try {
-            const expenseRef = doc(db, 'expenses', editingExpense.id)
-            await updateDoc(expenseRef, {
+            await FirestoreService.updateExpense(businessId, branchId, editingExpense.id, {
                 ...editingExpense,
                 amount: parseFloat(editingExpense.amount),
                 updatedAt: serverTimestamp()
             })
             setEditingExpense(null)
+            showSuccess('Expense updated successfully')
             fetchExpenses()
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Update Expense', 'Failed to update expense')
         } finally {
             setLoading(false)
         }
@@ -105,8 +110,13 @@ function Expenses() {
 
     const handleDelete = async (id) => {
         if (window.confirm('Delete this expense record?')) {
-            await deleteDoc(doc(db, 'expenses', id))
-            fetchExpenses()
+            try {
+                await FirestoreService.deleteExpense(businessId, branchId, id)
+                showSuccess('Expense deleted')
+                fetchExpenses()
+            } catch (err) {
+                handleError(err, 'Delete Expense', 'Failed to delete expense')
+            }
         }
     }
 

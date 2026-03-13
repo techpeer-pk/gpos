@@ -11,7 +11,12 @@ import {
     serverTimestamp
 } from 'firebase/firestore'
 
+import useAuthStore from '../../store/authStore-multi-branch'
+import FirestoreService from '../../firebase/firestore-multi-branch'
+import { handleError, showSuccess } from '../../utils/errorHandler'
+
 function Suppliers() {
+    const { businessId } = useAuthStore()
     const [suppliers, setSuppliers] = useState([])
     const [showForm, setShowForm] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -28,35 +33,36 @@ function Suppliers() {
 
     // Fetch Suppliers
     const fetchSuppliers = async () => {
+        if (!businessId) return
         try {
-            const snapshot = await getDocs(collection(db, 'suppliers'))
+            const snapshot = await FirestoreService.getSuppliers(businessId)
             setSuppliers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Fetch Suppliers', 'Failed to load suppliers')
         }
     }
 
     useEffect(() => {
-        const init = async () => {
-            await fetchSuppliers()
+        if (businessId) {
+            fetchSuppliers()
             setInitialLoading(false)
         }
-        init()
-    }, [])
+    }, [businessId])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
         setLoading(true)
         try {
-            await addDoc(collection(db, 'suppliers'), {
+            await FirestoreService.addSupplier(businessId, {
                 ...form,
                 createdAt: serverTimestamp()
             })
             setForm({ name: '', contactPerson: '', email: '', phone: '', address: '', category: '' })
             setShowForm(false)
+            showSuccess('Supplier added successfully')
             fetchSuppliers()
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Add Supplier', 'Failed to add supplier')
         } finally {
             setLoading(false)
         }
@@ -66,15 +72,15 @@ function Suppliers() {
         e.preventDefault()
         setLoading(true)
         try {
-            const supplierRef = doc(db, 'suppliers', editingSupplier.id)
-            await updateDoc(supplierRef, {
+            await FirestoreService.updateSupplier(businessId, editingSupplier.id, {
                 ...editingSupplier,
                 updatedAt: serverTimestamp()
             })
             setEditingSupplier(null)
+            showSuccess('Supplier updated successfully')
             fetchSuppliers()
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Update Supplier', 'Failed to update supplier')
         } finally {
             setLoading(false)
         }
@@ -82,8 +88,13 @@ function Suppliers() {
 
     const handleDelete = async (id) => {
         if (window.confirm('Delete this supplier?')) {
-            await deleteDoc(doc(db, 'suppliers', id))
-            fetchSuppliers()
+            try {
+                await FirestoreService.deleteSupplier(businessId, id)
+                showSuccess('Supplier deleted')
+                fetchSuppliers()
+            } catch (err) {
+                handleError(err, 'Delete Supplier', 'Failed to delete supplier')
+            }
         }
     }
 

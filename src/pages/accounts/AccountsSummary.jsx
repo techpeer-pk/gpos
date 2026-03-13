@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react'
-import Layout from '../../components/layout/Layout'
-import { db } from '../../firebase/config'
-import { collection, getDocs, getDoc, doc } from 'firebase/firestore'
+import useAuthStore from '../../store/authStore-multi-branch'
+import FirestoreService from '../../firebase/firestore-multi-branch'
 
 function AccountsSummary() {
+    const { businessId, branchId } = useAuthStore()
     const [sales, setSales] = useState([])
     const [expenses, setExpenses] = useState([])
     const [cashFlow, setCashFlow] = useState([])
@@ -15,18 +14,19 @@ function AccountsSummary() {
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!businessId || !branchId) return
             try {
-                const [salesSnap, expSnap, cashSnap, settingsSnap] = await Promise.all([
-                    getDocs(collection(db, 'sales')),
-                    getDocs(collection(db, 'expenses')),
-                    getDocs(collection(db, 'cash_flow')),
-                    getDoc(doc(db, 'settings', 'global'))
+                const [salesSnap, expSnap, cashSnap, businessSnap] = await Promise.all([
+                    FirestoreService.getSales(businessId, branchId),
+                    FirestoreService.getExpenses(businessId, branchId),
+                    FirestoreService.getCashFlow(businessId, branchId),
+                    FirestoreService.getBusiness(businessId)
                 ])
 
                 setSales(salesSnap.docs.map(d => ({ id: d.id, ...d.data() })))
                 setExpenses(expSnap.docs.map(d => ({ id: d.id, ...d.data() })))
                 setCashFlow(cashSnap.docs.map(d => ({ id: d.id, ...d.data() })))
-                if (settingsSnap.exists()) setSettings(settingsSnap.data())
+                if (businessSnap.exists()) setSettings(businessSnap.data())
             } catch (err) {
                 console.error(err)
             } finally {
@@ -34,7 +34,7 @@ function AccountsSummary() {
             }
         }
         fetchData()
-    }, [])
+    }, [businessId, branchId])
 
     const filterByPeriod = (data, dateField = 'createdAt') => {
         const now = new Date()

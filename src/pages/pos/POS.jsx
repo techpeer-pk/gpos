@@ -474,7 +474,7 @@ function POS() {
         setCart(heldSale.items)
         setSelectedCustomer(customers.find(c => c.id === heldSale.customerId) || null)
         try {
-            await deleteDoc(doc(db, 'suspended_sales', heldSale.id))
+            await FirestoreService.deleteSuspendedSale(businessId, branchId, heldSale.id)
             setSuspendedSales(suspendedSales.filter(s => s.id !== heldSale.id))
             setShowHeldSales(false)
             showSuccess('Sale resumed')

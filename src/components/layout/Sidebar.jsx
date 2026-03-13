@@ -41,7 +41,7 @@ function Sidebar({ isOpen, setIsOpen }) {
         { title: 'Main', paths: ['/dashboard', '/pos'] },
         { title: 'Management', paths: ['/products', '/inventory', '/suppliers', '/purchase-orders'] },
         { title: 'Sales', paths: ['/sales', '/customers'] },
-        { title: 'Administration', paths: ['/employees', '/reports', '/settings', '/import', '/backup'] },
+        { title: 'Administration', paths: ['/employees', '/branches', '/reports', '/settings', '/import', '/backup'] },
         { title: 'Accounts', paths: ['/accounts-summary', '/expenses', '/cash-flow', '/register-reconciliation'] },
         { title: 'Help', paths: ['/documentation', '/help', '/user-settings'] },
     ]

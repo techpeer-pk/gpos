@@ -17,7 +17,11 @@ import {
     orderBy
 } from 'firebase/firestore'
 
+import useAuthStore from '../../store/authStore-multi-branch'
+import FirestoreService from '../../firebase/firestore-multi-branch'
+
 function PurchaseOrders() {
+    const { businessId, branchId } = useAuthStore()
     const [pos, setPos] = useState([])
     const [suppliers, setSuppliers] = useState([])
     const [products, setProducts] = useState([])
@@ -32,27 +36,28 @@ function PurchaseOrders() {
 
     // Fetch Data
     const fetchData = async () => {
+        if (!businessId || !branchId) return
         try {
-            const poSnap = await getDocs(query(collection(db, 'purchase_orders'), orderBy('createdAt', 'desc')))
+            const [poSnap, supplierSnap, productSnap] = await Promise.all([
+                FirestoreService.getPurchaseOrders(businessId, branchId),
+                FirestoreService.getSuppliers(businessId),
+                FirestoreService.getProducts(businessId)
+            ])
+
             setPos(poSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })))
-
-            const supplierSnap = await getDocs(collection(db, 'suppliers'))
             setSuppliers(supplierSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })))
-
-            const productSnap = await getDocs(collection(db, 'products'))
             setProducts(productSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })))
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Fetch PO Data', 'Failed to load procurement data')
         }
     }
 
     useEffect(() => {
-        const init = async () => {
-            await fetchData()
+        if (businessId && branchId) {
+            fetchData()
             setInitialLoading(false)
         }
-        init()
-    }, [])
+    }, [businessId, branchId])
 
     const addToOrder = (product) => {
         const existing = orderItems.find(item => item.productId === product.id)
@@ -101,7 +106,7 @@ function PurchaseOrders() {
 
         setLoading(true)
         try {
-            await deleteDoc(doc(db, 'purchase_orders', po.id))
+            await FirestoreService.deletePurchaseOrder(businessId, branchId, po.id)
             showSuccess('Purchase order deleted successfully')
             fetchData()
         } catch (err) {
@@ -129,10 +134,10 @@ function PurchaseOrders() {
             }
 
             if (editingPo) {
-                await updateDoc(doc(db, 'purchase_orders', editingPo.id), poData)
+                await FirestoreService.updatePurchaseOrder(businessId, branchId, editingPo.id, poData)
                 showSuccess('Purchase order updated')
             } else {
-                await addDoc(collection(db, 'purchase_orders'), {
+                await FirestoreService.addPurchaseOrder(businessId, branchId, {
                     ...poData,
                     createdAt: serverTimestamp()
                 })
@@ -157,41 +162,36 @@ function PurchaseOrders() {
         setLoading(true)
         try {
             // 1. Update PO status
-            await updateDoc(doc(db, 'purchase_orders', po.id), {
+            await FirestoreService.updatePurchaseOrder(businessId, branchId, po.id, {
                 status: 'received',
                 receivedAt: serverTimestamp()
             })
 
             // 2. Update Inventory for each item
             for (const item of po.items) {
-                const invQuery = query(
-                    collection(db, 'inventory'),
-                    where('productId', '==', item.productId),
-                    limit(1)
-                )
-                const invSnap = await getDocs(invQuery)
+                const invSnap = await FirestoreService.getInventoryByProduct(businessId, branchId, item.productId)
 
                 if (!invSnap.empty) {
-                    await updateDoc(doc(db, 'inventory', invSnap.docs[0].id), {
-                        currentStock: increment(item.quantity),
+                    const invDoc = invSnap.docs[0]
+                    await FirestoreService.updateInventory(businessId, branchId, invDoc.id, {
+                        quantity: increment(item.quantity),
                         lastUpdated: serverTimestamp()
                     })
                 } else {
                     // Fallback: create inventory if missing
-                    await addDoc(collection(db, 'inventory'), {
+                    await FirestoreService.addInventory(businessId, branchId, item.productId, {
                         productId: item.productId,
-                        currentStock: item.quantity,
-                        minStock: 10,
-                        maxStock: 100,
+                        quantity: item.quantity,
+                        reorderLevel: 10,
                         lastUpdated: serverTimestamp()
                     })
                 }
             }
 
-            alert('Order received and inventory updated!')
+            showSuccess('Order received and inventory updated!')
             fetchData()
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Receive PO', 'Failed to receive order')
         } finally {
             setLoading(false)
         }

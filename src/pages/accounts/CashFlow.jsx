@@ -15,7 +15,12 @@ import {
     limit
 } from 'firebase/firestore'
 
+import useAuthStore from '../../store/authStore-multi-branch'
+import FirestoreService from '../../firebase/firestore-multi-branch'
+import { handleError, showSuccess } from '../../utils/errorHandler'
+
 function CashFlow() {
+    const { businessId, branchId } = useAuthStore()
     const [movements, setMovements] = useState([])
     const [loading, setLoading] = useState(false)
     const [initialLoading, setInitialLoading] = useState(true)
@@ -33,33 +38,33 @@ function CashFlow() {
     const [editingMovement, setEditingMovement] = useState(null)
 
     const fetchMovements = async () => {
+        if (!businessId || !branchId) return
         try {
-            const [movementsSnap, settingsSnap] = await Promise.all([
-                getDocs(query(collection(db, 'cash_flow'), orderBy('createdAt', 'desc'), limit(50))),
-                getDoc(doc(db, 'settings', 'global'))
+            const [movementsSnap, businessSnap] = await Promise.all([
+                FirestoreService.getCashFlow(businessId, branchId),
+                FirestoreService.getBusiness(businessId)
             ])
 
-            if (settingsSnap.exists()) setSettings(settingsSnap.data())
+            if (businessSnap.exists()) setSettings(businessSnap.data())
             setMovements(movementsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })))
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Fetch Cash Flow', 'Failed to load cash flow records')
         }
     }
 
     useEffect(() => {
-        const init = async () => {
-            await fetchMovements()
+        if (businessId && branchId) {
+            fetchMovements()
             setInitialLoading(false)
         }
-        init()
-    }, [])
+    }, [businessId, branchId])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
         setLoading(true)
         try {
             const amount = parseFloat(form.amount)
-            await addDoc(collection(db, 'cash_flow'), {
+            await FirestoreService.addCashFlow(businessId, branchId, {
                 ...form,
                 amount: type === 'out' ? -Math.abs(amount) : Math.abs(amount),
                 type,
@@ -71,9 +76,10 @@ function CashFlow() {
                 date: new Date().toISOString().split('T')[0]
             })
             setShowForm(false)
+            showSuccess('Cash flow recorded')
             fetchMovements()
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Add Cash Flow', 'Failed to record cash flow')
         } finally {
             setLoading(false)
         }
@@ -83,17 +89,17 @@ function CashFlow() {
         e.preventDefault()
         setLoading(true)
         try {
-            const moveRef = doc(db, 'cash_flow', editingMovement.id)
             const amount = parseFloat(editingMovement.amount)
-            await updateDoc(moveRef, {
+            await FirestoreService.updateCashFlow(businessId, branchId, editingMovement.id, {
                 ...editingMovement,
                 amount: editingMovement.type === 'out' ? -Math.abs(amount) : Math.abs(amount),
                 updatedAt: serverTimestamp()
             })
             setEditingMovement(null)
+            showSuccess('Cash flow updated')
             fetchMovements()
         } catch (err) {
-            console.error(err)
+            handleError(err, 'Update Cash Flow', 'Failed to update record')
         } finally {
             setLoading(false)
         }
@@ -102,10 +108,11 @@ function CashFlow() {
     const handleDelete = async (id) => {
         if (window.confirm('Delete this cash flow record? This will affect the calculated balance.')) {
             try {
-                await deleteDoc(doc(db, 'cash_flow', id))
+                await FirestoreService.deleteCashFlow(businessId, branchId, id)
+                showSuccess('Record deleted')
                 fetchMovements()
             } catch (err) {
-                console.error(err)
+                handleError(err, 'Delete Cash Flow', 'Failed to delete record')
             }
         }
     }

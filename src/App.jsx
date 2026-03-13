@@ -6,7 +6,7 @@ import { onAuthChange } from './firebase/auth'
 import { db } from './firebase/config'
 import { doc, getDoc } from 'firebase/firestore'
 import ProtectedRoute from './routes/ProtectedRoute'
-import useAuthStore from './store/authStore'
+import useAuthStore from './store/authStore-multi-branch'
 import useThemeStore from './store/themeStore'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
@@ -48,11 +48,12 @@ function App() {
       setLoading(true)
       try {
         if (currentUser) {
-          // User role/permissions are now managed during login
-          // and persisted in localStorage via authStore-multi-branch
-          // Just validate user exists in Firebase Auth
+          // Sync basic user info - business and branch context is 
+          // maintained via persist middleware in authStore-multi-branch
           setUser(currentUser)
         } else {
+          // On logout, the logout() action in the store should be called
+          // but this listener ensures the user state is clear
           setUser(null)
         }
       } catch (err) {
@@ -63,7 +64,7 @@ function App() {
       }
     })
     return () => unsubscribe()
-  }, [setUser, setLoading])
+  }, [setUser])
 
   if (loading) {
     return (
@@ -84,31 +85,30 @@ function App() {
         <Route path="/purpose" element={<Purpose />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" /> : <Login />} />
         <Route path="/register" element={user ? <Navigate to="/dashboard" /> : <Register />} />
-        <Route path="/pending" element={user && isPending ? <PendingApproval /> : <Navigate to="/dashboard" />} />
 
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/products" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Products /></ProtectedRoute>} />
+        <Route path="/products" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Products /></ProtectedRoute>} />
         <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
         <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
         <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
-        <Route path="/employees" element={<ProtectedRoute allowedRoles={['admin']}><Employees /></ProtectedRoute>} />
-        <Route path="/branches" element={<ProtectedRoute allowedRoles={['admin']}><Branches /></ProtectedRoute>} />
-        <Route path="/inventory" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Inventory /></ProtectedRoute>} />
-        <Route path="/reports" element={<ProtectedRoute allowedRoles={['admin']}><Reports /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin']}><Settings /></ProtectedRoute>} />
+        <Route path="/employees" element={<ProtectedRoute allowedRoles={['owner']}><Employees /></ProtectedRoute>} />
+        <Route path="/branches" element={<ProtectedRoute allowedRoles={['owner']}><Branches /></ProtectedRoute>} />
+        <Route path="/inventory" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Inventory /></ProtectedRoute>} />
+        <Route path="/reports" element={<ProtectedRoute allowedRoles={['owner']}><Reports /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute allowedRoles={['owner']}><Settings /></ProtectedRoute>} />
         <Route path="/user-settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
-        <Route path="/suppliers" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Suppliers /></ProtectedRoute>} />
-        <Route path="/purchase-orders" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><PurchaseOrders /></ProtectedRoute>} />
+        <Route path="/suppliers" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Suppliers /></ProtectedRoute>} />
+        <Route path="/purchase-orders" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><PurchaseOrders /></ProtectedRoute>} />
         <Route path="/invoice/:id" element={<Invoice />} />
         <Route path="/documentation" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
         <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
-        <Route path="/import" element={<ProtectedRoute allowedRoles={['admin']}><Import /></ProtectedRoute>} />
-        <Route path="/backup" element={<ProtectedRoute allowedRoles={['admin']}><Backup /></ProtectedRoute>} />
-        <Route path="/accounts-summary" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><AccountsSummary /></ProtectedRoute>} />
-        <Route path="/expenses" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Expenses /></ProtectedRoute>} />
-        <Route path="/cash-flow" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><CashFlow /></ProtectedRoute>} />
-        <Route path="/register-reconciliation" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><RegisterReconciliation /></ProtectedRoute>} />
-        <Route path="/po-invoice/:id" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><POInvoice /></ProtectedRoute>} />
+        <Route path="/import" element={<ProtectedRoute allowedRoles={['owner']}><Import /></ProtectedRoute>} />
+        <Route path="/backup" element={<ProtectedRoute allowedRoles={['owner']}><Backup /></ProtectedRoute>} />
+        <Route path="/accounts-summary" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><AccountsSummary /></ProtectedRoute>} />
+        <Route path="/expenses" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Expenses /></ProtectedRoute>} />
+        <Route path="/cash-flow" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><CashFlow /></ProtectedRoute>} />
+        <Route path="/register-reconciliation" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><RegisterReconciliation /></ProtectedRoute>} />
+        <Route path="/po-invoice/:id" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><POInvoice /></ProtectedRoute>} />
         <Route path="/docs" element={<PublicDocumentation />} />
       </Routes>
     </ErrorBoundary>

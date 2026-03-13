@@ -14,7 +14,11 @@ import {
 } from 'firebase/firestore'
 import { handleError, showSuccess } from '../../utils/errorHandler'
 
+import useAuthStore from '../../store/authStore-multi-branch'
+import FirestoreService from '../../firebase/firestore-multi-branch'
+
 function RegisterReconciliation() {
+    const { businessId, branchId } = useAuthStore()
     const [cashFlow, setCashFlow] = useState([])
     const [loading, setLoading] = useState(true)
     const [submitting, setSubmitting] = useState(false)
@@ -27,17 +31,14 @@ function RegisterReconciliation() {
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!businessId || !branchId) return
             try {
-                // Fetch settings
-                const settingsSnap = await getDoc(doc(db, 'settings', 'global'))
-                if (settingsSnap.exists()) setSettings(settingsSnap.data())
+                // Fetch business settings
+                const businessSnap = await FirestoreService.getBusiness(businessId)
+                if (businessSnap.exists()) setSettings(businessSnap.data())
 
-                // Fetch last reconciliation query
-                const lastRecSnap = await getDocs(query(
-                    collection(db, 'reconciliations'),
-                    orderBy('createdAt', 'desc'),
-                    where('status', '==', 'completed')
-                ))
+                // Fetch last reconciliation
+                const lastRecSnap = await FirestoreService.getReconciliations(businessId, branchId)
 
                 let startTime = null
                 if (!lastRecSnap.empty) {
@@ -47,11 +48,7 @@ function RegisterReconciliation() {
                 }
 
                 // Fetch cash flow since last reconciliation
-                let cashQuery = query(collection(db, 'cash_flow'), orderBy('createdAt', 'desc'))
-
-                // If we have a startTime, we should filter by it, but Firestore requires composite index for query + orderBy
-                // For simplicity in this step, we'll fetch all and filter in JS if needed, or just fetch all for now
-                const cashSnap = await getDocs(cashQuery)
+                const cashSnap = await FirestoreService.getCashFlow(businessId, branchId)
                 let cashList = cashSnap.docs.map(d => ({ id: d.id, ...d.data() }))
 
                 if (startTime) {
@@ -70,7 +67,7 @@ function RegisterReconciliation() {
             }
         }
         fetchData()
-    }, [])
+    }, [businessId, branchId])
 
     const cashIn = cashFlow.filter(c => c.type === 'in').reduce((sum, c) => sum + (c.amount || 0), 0)
     const cashOut = cashFlow.filter(c => c.type === 'out').reduce((sum, c) => sum + (c.amount || 0), 0)
@@ -98,7 +95,7 @@ function RegisterReconciliation() {
                 periodEnd: serverTimestamp()
             }
 
-            await addDoc(collection(db, 'reconciliations'), reportData)
+            await FirestoreService.addReconciliation(businessId, branchId, reportData)
             showSuccess('Register closed and report saved!')
 
             // Reset for next shift

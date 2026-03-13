@@ -29,6 +29,8 @@ function Employees() {
         assignedBranches: []
     })
 
+    const [branches, setBranches] = useState([])
+
     // Fetch pending users from pending_users collection
     const fetchPendingUsers = async () => {
         try {
@@ -50,12 +52,15 @@ function Employees() {
         try {
             const snapshot = await getDocs(collection(db, 'business_users', businessId))
             const list = []
-            for (const userDoc of snapshot.docs) {
-                const profileSnap = await getDocs(collection(db, 'business_users', businessId, userDoc.id))
+            
+            // For each user document in the business, fetch their profile
+            await Promise.all(snapshot.docs.map(async (userDoc) => {
+                const profileSnap = await getDocs(collection(db, 'business_users', businessId, userDoc.id, 'profile'))
                 profileSnap.forEach(profileDoc => {
                     list.push({ uid: userDoc.id, ...profileDoc.data() })
                 })
-            }
+            }))
+            
             setActiveEmployees(list)
         } catch (error) {
             console.error('Error fetching approved employees:', error)
@@ -63,10 +68,22 @@ function Employees() {
         }
     }
 
+    const fetchBranches = async () => {
+        if (!businessId) return
+        try {
+            const snapshot = await FirestoreService.getBranches(businessId)
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            setBranches(list)
+        } catch (error) {
+            console.error('Error fetching branches:', error)
+        }
+    }
+
     useEffect(() => {
-        fetchPendingUsers()
         if (businessId) {
+            fetchPendingUsers()
             fetchApprovedEmployees()
+            fetchBranches()
         }
     }, [businessId])
 
@@ -166,8 +183,6 @@ function Employees() {
         }
     }
 
-    const pendingUsers = employees.filter(emp => emp.role === 'pending')
-    const activeEmployees = employees.filter(emp => emp.role !== 'pending')
 
     return (
         <Layout title="Employee Management">
@@ -275,7 +290,32 @@ function Employees() {
                             >
                                 <option value="cashier">Cashier (POS Only)</option>
                                 <option value="manager">Manager (Inventory + Products)</option>
+                                <option value="owner">Owner (Full Access)</option>
                             </select>
+                        </div>
+                        <div className="col-span-2">
+                            <label className="text-sm text-gray-600 block mb-2">Assigned Branches</label>
+                            <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-3 border rounded-lg bg-gray-50">
+                                {branches.map(branch => (
+                                    <label key={branch.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-100 p-1 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.assignedBranches?.includes(branch.id)}
+                                            onChange={(e) => {
+                                                const checked = e.target.checked
+                                                setForm(prev => ({
+                                                    ...prev,
+                                                    assignedBranches: checked
+                                                        ? [...(prev.assignedBranches || []), branch.id]
+                                                        : (prev.assignedBranches || []).filter(id => id !== branch.id)
+                                                }))
+                                            }}
+                                            className="rounded text-blue-600"
+                                        />
+                                        <span className="truncate">{branch.branchName}</span>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
                         <div className="col-span-2 flex gap-3 justify-end mt-2">
                             <button
@@ -333,7 +373,13 @@ function Employees() {
                                     <div className="flex gap-3">
                                         <button
                                             onClick={() => {
-                                                setForm({ uid: emp.uid, name: emp.name, email: emp.email, role: emp.role })
+                                                setForm({ 
+                                                    uid: emp.uid, 
+                                                    name: emp.name, 
+                                                    email: emp.email, 
+                                                    role: emp.role,
+                                                    assignedBranches: emp.assignedBranches || []
+                                                })
                                                 setShowForm(true)
                                             }}
                                             className="text-blue-600 hover:text-blue-800 text-sm"

@@ -1,20 +1,12 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/layout/Layout'
-import { db } from '../../firebase/config'
+import FirestoreService from '../../firebase/firestore-multi-branch'
 import { handleError, showSuccess } from '../../utils/errorHandler'
-import {
-    collection,
-    getDocs,
-    addDoc,
-    deleteDoc,
-    updateDoc,
-    doc,
-    serverTimestamp
-} from 'firebase/firestore'
-import useAuthStore from '../../store/authStore'
+import { serverTimestamp } from 'firebase/firestore'
+import useAuthStore from '../../store/authStore-multi-branch'
 
 function Customers() {
-    const { user } = useAuthStore()
+    const { user, businessId } = useAuthStore()
     const [customers, setCustomers] = useState([])
     const [showForm, setShowForm] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -28,18 +20,21 @@ function Customers() {
     const [initialLoading, setInitialLoading] = useState(true)
 
     const fetchCustomers = async () => {
-        const snapshot = await getDocs(collection(db, 'customers'))
-        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        setCustomers(list)
+        try {
+            const snapshot = await FirestoreService.getCustomers(businessId)
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+            setCustomers(list)
+        } catch (err) {
+            handleError(err, 'Fetch Customers')
+        }
     }
 
     useEffect(() => {
-        const init = async () => {
-            await fetchCustomers()
+        if (businessId) {
+            fetchCustomers()
             setInitialLoading(false)
         }
-        init()
-    }, [])
+    }, [businessId])
 
     if (initialLoading) {
         return (
@@ -56,7 +51,7 @@ function Customers() {
         e.preventDefault()
         setLoading(true)
         try {
-            await addDoc(collection(db, 'customers'), {
+            await FirestoreService.addCustomer(businessId, {
                 ...form,
                 loyaltyPoints: 0,
                 totalSpent: 0,
@@ -79,8 +74,7 @@ function Customers() {
         e.preventDefault()
         setLoading(true)
         try {
-            const customerRef = doc(db, 'customers', editingCustomer.id)
-            await updateDoc(customerRef, {
+            await FirestoreService.updateCustomer(businessId, editingCustomer.id, {
                 ...editingCustomer,
                 updatedAt: serverTimestamp()
             })
@@ -96,8 +90,13 @@ function Customers() {
 
     const handleDelete = async (id) => {
         if (window.confirm('Delete this customer?')) {
-            await deleteDoc(doc(db, 'customers', id))
-            fetchCustomers()
+            try {
+                await FirestoreService.deleteCustomer(businessId, id)
+                showSuccess('Customer deleted')
+                fetchCustomers()
+            } catch (err) {
+                handleError(err, 'Delete Customer')
+            }
         }
     }
 

@@ -221,12 +221,12 @@ function Inventory() {
                 aVal = getProductName(a.productId).toLowerCase()
                 bVal = getProductName(b.productId).toLowerCase()
             } else if (sortCol === 'stock') {
-                aVal = a.currentStock || 0; bVal = b.currentStock || 0
+                aVal = a.quantity || 0; bVal = b.quantity || 0
             } else if (sortCol === 'status') {
-                aVal = a.currentStock <= 0 ? 0 : a.currentStock <= a.minStock ? 1 : 2
-                bVal = b.currentStock <= 0 ? 0 : b.currentStock <= b.minStock ? 1 : 2
+                aVal = a.quantity <= 0 ? 0 : a.quantity <= a.reorderLevel ? 1 : 2
+                bVal = b.quantity <= 0 ? 0 : b.quantity <= b.reorderLevel ? 1 : 2
             } else if (sortCol === 'min') {
-                aVal = a.minStock || 0; bVal = b.minStock || 0
+                aVal = a.reorderLevel || 0; bVal = b.reorderLevel || 0
             } else if (sortCol === 'max') {
                 aVal = a.maxStock || 0; bVal = b.maxStock || 0
             } else {
@@ -315,19 +315,19 @@ function Inventory() {
                             <input
                                 type="number"
                                 required
-                                value={form.currentStock}
-                                onChange={(e) => setForm({ ...form, currentStock: e.target.value })}
+                                value={form.quantity}
+                                onChange={(e) => setForm({ ...form, quantity: e.target.value })}
                                 className="w-full border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                                 placeholder="0"
                             />
                         </div>
                         <div>
-                            <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-2">Threshold (Min Stock) *</label>
+                            <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-2">Threshold (Reorder Level) *</label>
                             <input
                                 type="number"
                                 required
-                                value={form.minStock}
-                                onChange={(e) => setForm({ ...form, minStock: e.target.value })}
+                                value={form.reorderLevel}
+                                onChange={(e) => setForm({ ...form, reorderLevel: e.target.value })}
                                 className="w-full border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
                                 placeholder="10"
                             />
@@ -410,7 +410,7 @@ function Inventory() {
                                 bulkFiltered.map(item => {
                                     const change = bulkChanges[item.id] || { mode: 'add', value: '' }
                                     const isChanged = change.value !== '' && change.value !== undefined
-                                    const status = getStockStatus(item.currentStock, item.minStock)
+                                    const status = getStockStatus(item.quantity, item.reorderLevel)
                                     return (
                                         <div
                                             key={item.id}
@@ -426,7 +426,7 @@ function Inventory() {
                                             <div className="text-center flex-shrink-0 w-14">
                                                 <span className="text-[9px] text-gray-400 block uppercase tracking-widest">Current</span>
                                                 <span className={`text-sm font-black ${status.color.includes('red') ? 'text-red-500' : status.color.includes('yellow') ? 'text-yellow-600' : 'text-gray-800 dark:text-gray-100'}`}>
-                                                    {item.currentStock}
+                                                    {item.quantity}
                                                 </span>
                                             </div>
 
@@ -436,7 +436,7 @@ function Inventory() {
                                                 <span className="text-sm font-black text-green-600 dark:text-green-400">
                                                     {isChanged
                                                         ? (change.mode === 'add'
-                                                            ? Math.max(0, item.currentStock + (parseInt(change.value) || 0))
+                                                            ? Math.max(0, (item.quantity || 0) + (parseInt(change.value) || 0))
                                                             : Math.max(0, parseInt(change.value) || 0))
                                                         : '—'
                                                     }
@@ -446,6 +446,7 @@ function Inventory() {
                                             {/* Mode toggle: Add / Set */}
                                             <div className="flex rounded-xl overflow-hidden border dark:border-gray-700 flex-shrink-0">
                                                 <button
+                                                    type="button"
                                                     onClick={() => setBulkField(item.id, 'mode', 'add')}
                                                     className={`px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition ${change.mode === 'add'
                                                         ? 'bg-green-600 text-white'
@@ -453,6 +454,7 @@ function Inventory() {
                                                         }`}
                                                 >Add</button>
                                                 <button
+                                                    type="button"
                                                     onClick={() => setBulkField(item.id, 'mode', 'set')}
                                                     className={`px-2.5 py-1.5 text-[10px] font-black uppercase tracking-widest transition ${change.mode === 'set'
                                                         ? 'bg-blue-600 text-white'
@@ -477,6 +479,7 @@ function Inventory() {
                                             {/* Clear row */}
                                             {isChanged && (
                                                 <button
+                                                    type="button"
                                                     onClick={() => {
                                                         setBulkChanges(prev => {
                                                             const next = { ...prev }
@@ -588,7 +591,7 @@ function Inventory() {
                                 </tr>
                             ) : (
                                 paginated.map((item, index) => {
-                                    const status = getStockStatus(item.currentStock, item.minStock)
+                                    const status = getStockStatus(item.quantity, item.reorderLevel)
                                     return (
                                         <tr key={item.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors group">
                                             <td className="px-4 py-4 text-gray-400 dark:text-gray-500 text-xs font-medium">
@@ -599,19 +602,19 @@ function Inventory() {
                                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">{getProductCategory(item.productId) || `ID: ${item.productId.slice(-8)}`}</p>
                                             </td>
                                             <td className="px-4 py-4">
-                                                <span className="text-xl font-black text-gray-900 dark:text-gray-100">{item.currentStock}</span>
+                                                <span className="text-xl font-black text-gray-900 dark:text-gray-100">{item.quantity}</span>
                                                 <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase ml-1">UNITS</span>
                                             </td>
                                             <td className="px-4 py-4">
                                                 <div className="flex items-center justify-center gap-4 text-xs font-bold">
                                                     <div className="text-center">
                                                         <span className="text-[9px] text-gray-400 dark:text-gray-500 block uppercase tracking-tighter">Min</span>
-                                                        <span className="text-gray-600 dark:text-gray-400">{item.minStock}</span>
+                                                        <span className="text-gray-600 dark:text-gray-400">{item.reorderLevel}</span>
                                                     </div>
                                                     <div className="w-16 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden relative border dark:border-gray-700">
                                                         <div
-                                                            className={`absolute inset-0 transition-all ${item.currentStock <= item.minStock ? 'bg-amber-500' : 'bg-blue-500'}`}
-                                                            style={{ width: `${Math.min((item.currentStock / (item.maxStock || 1)) * 100, 100)}%` }}
+                                                            className={`absolute inset-0 transition-all ${item.quantity <= item.reorderLevel ? 'bg-amber-500' : 'bg-blue-500'}`}
+                                                            style={{ width: `${Math.min((item.quantity / (item.maxStock || 1)) * 100, 100)}%` }}
                                                         />
                                                     </div>
                                                     <div className="text-center">
@@ -629,7 +632,7 @@ function Inventory() {
                                                 <div className="flex items-center justify-end gap-2">
                                                     <input
                                                         type="number"
-                                                        defaultValue={item.currentStock}
+                                                        defaultValue={item.quantity}
                                                         className="w-24 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-blue-500 rounded-xl px-3 py-2 text-sm font-black text-gray-800 dark:text-gray-100 focus:outline-none transition-all text-right shadow-inner"
                                                         onBlur={(e) => handleStockUpdate(item.id, e.target.value)}
                                                     />

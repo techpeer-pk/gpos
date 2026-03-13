@@ -283,6 +283,38 @@ export const getCashFlowForDate = (businessId, branchId, startDate, endDate) => 
     return getDocs(q)
 }
 
+export const updateCashFlow = (businessId, branchId, cashFlowId, data) => {
+    return updateDoc(doc(db, `businesses/${businessId}/branches/${branchId}/cash_flow/${cashFlowId}`), {
+        ...data,
+        updatedAt: serverTimestamp()
+    })
+}
+
+export const deleteCashFlow = (businessId, branchId, cashFlowId) => {
+    return deleteDoc(doc(db, `businesses/${businessId}/branches/${branchId}/cash_flow/${cashFlowId}`))
+}
+
+// ============================================
+// REGISTER RECONCILIATION (Branch-Specific)
+// ============================================
+
+export const addReconciliation = (businessId, branchId, data) => {
+    return addDoc(collection(db, `businesses/${businessId}/branches/${branchId}/reconciliations`), {
+        ...data,
+        branchId,
+        createdAt: serverTimestamp()
+    })
+}
+
+export const getReconciliations = (businessId, branchId) => {
+    return getDocs(
+        query(
+            collection(db, `businesses/${businessId}/branches/${branchId}/reconciliations`),
+            orderBy('createdAt', 'desc')
+        )
+    )
+}
+
 // ============================================
 // BRANCH STOCK TRANSFERS (New Feature)
 // ============================================
@@ -309,6 +341,74 @@ export const updateStockTransfer = (businessId, transferId, data) => {
         ...data,
         updatedAt: serverTimestamp()
     })
+}
+
+// ============================================
+// PURCHASE ORDERS (Branch-Specific)
+// ============================================
+
+export const addPurchaseOrder = (businessId, branchId, data) => {
+    return addDoc(collection(db, `businesses/${businessId}/branches/${branchId}/purchase_orders`), {
+        ...data,
+        branchId,
+        createdAt: serverTimestamp()
+    })
+}
+
+export const getPurchaseOrders = (businessId, branchId) => {
+    return getDocs(
+        query(
+            collection(db, `businesses/${businessId}/branches/${branchId}/purchase_orders`),
+            orderBy('createdAt', 'desc')
+        )
+    )
+}
+
+export const updatePurchaseOrder = (businessId, branchId, poId, data) => {
+    return updateDoc(doc(db, `businesses/${businessId}/branches/${branchId}/purchase_orders/${poId}`), {
+        ...data,
+        updatedAt: serverTimestamp()
+    })
+}
+
+export const deletePurchaseOrder = (businessId, branchId, poId) => {
+    return deleteDoc(doc(db, `businesses/${businessId}/branches/${branchId}/purchase_orders/${poId}`))
+}
+
+export const getPurchaseOrderById = (businessId, branchId, poId) => {
+    return getDoc(doc(db, `businesses/${businessId}/branches/${branchId}/purchase_orders/${poId}`))
+}
+
+// ============================================
+// EXPENSES (Branch-Specific)
+// ============================================
+
+export const addExpense = (businessId, branchId, data) => {
+    return addDoc(collection(db, `businesses/${businessId}/branches/${branchId}/expenses`), {
+        ...data,
+        branchId,
+        createdAt: serverTimestamp()
+    })
+}
+
+export const getExpenses = (businessId, branchId) => {
+    return getDocs(
+        query(
+            collection(db, `businesses/${businessId}/branches/${branchId}/expenses`),
+            orderBy('date', 'desc')
+        )
+    )
+}
+
+export const updateExpense = (businessId, branchId, expenseId, data) => {
+    return updateDoc(doc(db, `businesses/${businessId}/branches/${branchId}/expenses/${expenseId}`), {
+        ...data,
+        updatedAt: serverTimestamp()
+    })
+}
+
+export const deleteExpense = (businessId, branchId, expenseId) => {
+    return deleteDoc(doc(db, `businesses/${businessId}/branches/${branchId}/expenses/${expenseId}`))
 }
 
 // ============================================
@@ -469,9 +569,15 @@ export default {
     // Suspended Sales
     addSuspendedSale, getSuspendedSales, getSuspendedSaleById, updateSuspendedSale, deleteSuspendedSale,
     // Cash Flow
-    addCashFlow, getCashFlow, getCashFlowForDate,
+    addCashFlow, getCashFlow, getCashFlowForDate, updateCashFlow, deleteCashFlow,
+    // Reconciliation
+    addReconciliation, getReconciliations,
     // Stock Transfer
     createStockTransfer, getStockTransfers, updateStockTransfer,
+    // Purchase Orders
+    addPurchaseOrder, getPurchaseOrders, updatePurchaseOrder, deletePurchaseOrder, getPurchaseOrderById,
+    // Expenses
+    addExpense, getExpenses, updateExpense, deleteExpense,
     // Business & Branch
     getBusiness, updateBusiness, getBranches, addBranch, updateBranch, getBranch, deleteBranch,
     // Batch Operations

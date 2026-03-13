@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import useAuthStore from '../../store/authStore'
+import useAuthStore from '../../store/authStore-multi-branch'
 import useThemeStore from '../../store/themeStore'
 
 function Navbar({ title, onMenuClick }) {
-    const { user } = useAuthStore()
+    const { user, userRole } = useAuthStore()
     const { isDarkMode, toggleTheme } = useThemeStore()
     const [isOnline, setIsOnline] = useState(navigator.onLine)
 
@@ -60,7 +60,7 @@ function Navbar({ title, onMenuClick }) {
                 )}
                 <div className="text-right hidden sm:block">
                     <p className="text-sm font-bold text-gray-800 dark:text-gray-100 leading-none">{user?.displayName || 'User'}</p>
-                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">{user?.role || 'Staff'}</p>
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">{userRole || 'Staff'}</p>
                 </div>
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-blue-200 dark:shadow-none ring-2 ring-white dark:ring-gray-800">
                     {user?.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}

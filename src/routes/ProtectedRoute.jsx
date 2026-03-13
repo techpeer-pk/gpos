@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom'
-import useAuthStore from '../store/authStore'
+import useAuthStore from '../store/authStore-multi-branch'
 
 function ProtectedRoute({ children, allowedRoles }) {
     const { user, loading } = useAuthStore()
@@ -15,11 +15,9 @@ function ProtectedRoute({ children, allowedRoles }) {
         return <Navigate to="/login" />
     }
 
-    if (user.role === 'pending') {
-        return <Navigate to="/pending" />
-    }
+    const { userRole } = useAuthStore()
 
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
+    if (allowedRoles && !allowedRoles.includes(userRole)) {
         return <Navigate to="/dashboard" />
     }
 
