@@ -29,7 +29,12 @@ const useAuthStore = create(
             // Theme (existing)
             isDarkMode: false,
 
+            // Auth Loading State
+            loading: true,
+
             // ========== USER ACTIONS ==========
+
+            setLoading: (loading) => set({ loading }),
 
             setUser: (user) => {
                 set({

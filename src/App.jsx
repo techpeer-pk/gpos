@@ -45,26 +45,13 @@ function App() {
   useEffect(() => {
     initTheme()
     const unsubscribe = onAuthChange(async (currentUser) => {
-      setLoading(true)
-      try {
-        if (currentUser) {
-          // Sync basic user info - business and branch context is 
-          // maintained via persist middleware in authStore-multi-branch
-          setUser(currentUser)
-        } else {
-          // On logout, the logout() action in the store should be called
-          // but this listener ensures the user state is clear
-          setUser(null)
-        }
-      } catch (err) {
-        console.error("Auth sync error:", err)
-        setUser(null)
-      } finally {
-        setLoading(false)
-      }
+      // Sync basic user info - business and branch context is 
+      // maintained via persist middleware in authStore-multi-branch
+      setUser(currentUser)
+      setLoading(false)
     })
     return () => unsubscribe()
-  }, [setUser])
+  }, [setUser, setLoading])
 
   if (loading) {
     return (
