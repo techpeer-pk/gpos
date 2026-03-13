@@ -29,6 +29,7 @@ import Suppliers from './pages/inventory/Suppliers'
 import PurchaseOrders from './pages/inventory/PurchaseOrders'
 import Import from './pages/settings/Import'
 import Backup from './pages/settings/Backup'
+import Branches from './pages/settings/Branches'
 import Expenses from './pages/accounts/Expenses'
 import CashFlow from './pages/accounts/CashFlow'
 import AccountsSummary from './pages/accounts/AccountsSummary'
@@ -107,6 +108,7 @@ function App() {
         <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
         <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute allowedRoles={['admin']}><Employees /></ProtectedRoute>} />
+        <Route path="/branches" element={<ProtectedRoute allowedRoles={['admin']}><Branches /></ProtectedRoute>} />
         <Route path="/inventory" element={<ProtectedRoute allowedRoles={['admin', 'manager']}><Inventory /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute allowedRoles={['admin']}><Reports /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin']}><Settings /></ProtectedRoute>} />

@@ -14,6 +14,7 @@ const menuItems = [
     { path: '/sales', icon: '💰', label: 'Sales', roles: ['owner', 'manager', 'cashier'] },
     { path: '/customers', icon: '👥', label: 'Customers', roles: ['owner', 'manager', 'cashier'] },
     { path: '/employees', icon: '👨‍💼', label: 'Employees', roles: ['owner'] },
+    { path: '/branches', icon: '🏢', label: 'Branches', roles: ['owner'] },
     { path: '/reports', icon: '📈', label: 'Reports', roles: ['owner'] },
     { path: '/settings', icon: '⚙️', label: 'Settings', roles: ['owner'] },
     { path: '/import', icon: '⬆️', label: 'Import Data', roles: ['owner'] },

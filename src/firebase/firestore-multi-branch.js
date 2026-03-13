@@ -348,6 +348,10 @@ export const getBranch = (businessId, branchId) => {
     return getDoc(doc(db, `businesses/${businessId}/branches/${branchId}`))
 }
 
+export const deleteBranch = (businessId, branchId) => {
+    return deleteDoc(doc(db, `businesses/${businessId}/branches/${branchId}`))
+}
+
 // ============================================
 // BATCH OPERATIONS
 // ============================================
@@ -469,7 +473,7 @@ export default {
     // Stock Transfer
     createStockTransfer, getStockTransfers, updateStockTransfer,
     // Business & Branch
-    getBusiness, updateBusiness, getBranches, addBranch, updateBranch, getBranch,
+    getBusiness, updateBusiness, getBranches, addBranch, updateBranch, getBranch, deleteBranch,
     // Batch Operations
     batchAddInventoryItems, batchUpdateSalesWithCashFlow,
     // Aggregation
