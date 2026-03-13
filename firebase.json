@@ -1,5 +1,6 @@
 {
     "hosting": {
+        "site": "gpos-dev-cx",
         "public": "dist",
         "ignore": [
             "firebase.json",

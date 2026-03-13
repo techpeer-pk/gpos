@@ -22,6 +22,8 @@ build/
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+firebase.json
+.firebaserc
 
 # Logs
 npm-debug.log*
