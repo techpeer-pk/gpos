@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/layout/Layout'
+import useAuthStore from '../../store/authStore-multi-branch'
+import FirestoreService from '../../firebase/firestore-multi-branch'
 import { db } from '../../firebase/config'
 import { handleError, showSuccess } from '../../utils/errorHandler'
 import {
@@ -12,6 +14,7 @@ import {
 } from 'firebase/firestore'
 
 function Employees() {
+    const { businessId } = useAuthStore()
     const [employees, setEmployees] = useState([])
     const [showForm, setShowForm] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -20,43 +23,72 @@ function Employees() {
         name: '',
         email: '',
         role: 'cashier',
+        assignedBranches: []
     })
 
     const fetchEmployees = async () => {
-        const snapshot = await getDocs(collection(db, 'users'))
-        const list = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }))
-        setEmployees(list)
+        if (!businessId) return
+        try {
+            const snapshot = await getDocs(collection(db, 'business_users', businessId))
+            const list = []
+            for (const userDoc of snapshot.docs) {
+                const profileSnap = await getDocs(collection(db, 'business_users', businessId, userDoc.id))
+                profileSnap.forEach(profileDoc => {
+                    list.push({ uid: userDoc.id, ...profileDoc.data() })
+                })
+            }
+            setEmployees(list)
+        } catch (error) {
+            console.error('Error fetching employees:', error)
+            handleError(error, 'Fetch Employees', 'Failed to fetch employee list')
+        }
     }
 
     useEffect(() => {
-        fetchEmployees()
-    }, [])
+        if (businessId) {
+            fetchEmployees()
+        }
+    }, [businessId])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
         setLoading(true)
         try {
-            await setDoc(doc(db, 'users', form.uid), {
+            if (!form.uid) {
+                handleError(null, 'Save Employee', 'Please enter employee UID')
+                setLoading(false)
+                return
+            }
+            
+            await setDoc(doc(db, 'business_users', businessId, form.uid, 'profile'), {
+                uid: form.uid,
                 name: form.name,
                 email: form.email,
                 role: form.role,
+                assignedBranches: form.assignedBranches || [],
                 updatedAt: serverTimestamp()
             }, { merge: true })
-            setForm({ uid: '', name: '', email: '', role: 'cashier' })
+            
+            setForm({ uid: '', name: '', email: '', role: 'cashier', assignedBranches: [] })
             setShowForm(false)
             showSuccess('Employee saved successfully')
             fetchEmployees()
         } catch (err) {
-            handleError(err, 'Save Employee', 'Failed to save employee. Make sure the UID is correct.')
+            handleError(err, 'Save Employee', 'Failed to save employee')
         } finally {
             setLoading(false)
         }
     }
 
-    const handleDelete = async (id) => {
+    const handleDelete = async (uid) => {
         if (window.confirm('Remove this employee?')) {
-            await deleteDoc(doc(db, 'users', id))
-            fetchEmployees()
+            try {
+                await deleteDoc(doc(db, 'business_users', businessId, uid, 'profile'))
+                fetchEmployees()
+                showSuccess('Employee removed')
+            } catch (err) {
+                handleError(err, 'Delete Employee', 'Failed to remove employee')
+            }
         }
     }
 
@@ -170,7 +202,6 @@ function Employees() {
                             >
                                 <option value="cashier">Cashier (POS Only)</option>
                                 <option value="manager">Manager (Inventory + Products)</option>
-                                <option value="admin">Admin (Full Access)</option>
                             </select>
                         </div>
                         <div className="col-span-2 flex gap-3 justify-end mt-2">

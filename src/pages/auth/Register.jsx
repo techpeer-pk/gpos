@@ -24,14 +24,9 @@ function Register() {
             // Update Auth Profile
             await updateProfile(user, { displayName: name })
 
-            // Create Firestore User Doc with 'pending' role
-            await setDoc(doc(db, 'users', user.uid), {
-                name,
-                email,
-                role: 'pending',
-                createdAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            })
+            // Note: User profile will be created in business_users collection
+            // when the business owner assigns them to a branch
+            // (See Employees.jsx for user assignment flow)
 
             navigate('/pending')
         } catch (err) {

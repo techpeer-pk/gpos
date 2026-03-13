@@ -48,28 +48,12 @@ function App() {
       setLoading(true)
       try {
         if (currentUser) {
-          // Use the authStore to update role once fetched
-          const { setRole, role: cachedRole } = useAuthStore.getState()
-
-          try {
-            const userDoc = await getDoc(doc(db, 'users', currentUser.uid))
-            if (userDoc.exists()) {
-              const userData = userDoc.data()
-              setRole(userData.role)
-              setUser({ ...currentUser, ...userData })
-            } else {
-              // Fallback to cached role or default
-              const finalRole = cachedRole || 'pending'
-              setUser({ ...currentUser, role: finalRole })
-            }
-          } catch (dbErr) {
-            console.warn("Firestore role fetch failed (likely offline):", dbErr)
-            // If offline, trust the cachedRole from authStore (localStorage)
-            setUser({ ...currentUser, role: cachedRole || 'pending' })
-          }
+          // User role/permissions are now managed during login
+          // and persisted in localStorage via authStore-multi-branch
+          // Just validate user exists in Firebase Auth
+          setUser(currentUser)
         } else {
           setUser(null)
-          localStorage.removeItem('gpos_user_role')
         }
       } catch (err) {
         console.error("Auth sync error:", err)

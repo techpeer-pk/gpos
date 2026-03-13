@@ -3,11 +3,11 @@ import Layout from '../../components/layout/Layout'
 import { auth, db } from '../../firebase/config'
 import { updateProfile, updatePassword } from 'firebase/auth'
 import { doc, updateDoc } from 'firebase/firestore'
-import useAuthStore from '../../store/authStore'
+import useAuthStore from '../../store/authStore-multi-branch'
 import { handleError, showSuccess } from '../../utils/errorHandler'
 
 function UserSettings() {
-    const { user, setUser } = useAuthStore()
+    const { user, businessId } = useAuthStore()
     const [name, setName] = useState(user?.displayName || '')
     const [newPassword, setNewPassword] = useState('')
     const [loading, setLoading] = useState(false)
@@ -25,12 +25,11 @@ function UserSettings() {
             // Update Firebase Auth
             await updateProfile(auth.currentUser, { displayName: name })
 
-            // Update Firestore 'users' collection
-            const userRef = doc(db, 'users', auth.currentUser.uid)
-            await updateDoc(userRef, { name: name })
-
-            // Update Global State
-            setUser({ ...user, displayName: name })
+            // Update Firestore business_users collection
+            if (businessId && auth.currentUser?.uid) {
+                const userRef = doc(db, 'business_users', businessId, auth.currentUser.uid, 'profile')
+                await updateDoc(userRef, { name: name })
+            }
 
             showSuccess('Profile updated successfully')
         } catch (err) {
