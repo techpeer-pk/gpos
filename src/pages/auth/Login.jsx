@@ -24,33 +24,36 @@ function Login() {
             const userCredential = await signInWithEmailAndPassword(auth, email, password)
             const user = userCredential.user
 
-            // Step 2: Get user profile from global users collection
+            // Step 2: Get user profile from GLOBAL users collection (SBS Guide Pattern)
             const userDoc = await getDoc(doc(db, 'users', user.uid))
             const userData = userDoc.exists() ? userDoc.data() : null
 
+            if (!userData) {
+                // Public breach fix: If no global record, they aren't authorized
+                setError('No account record found. Please register or contact your admin.')
+                setLoading(false)
+                return
+            }
+
+            const businessId = userData.businessId
+            const userRole = userData.role
+
             // Step 3: Check for pending status
-            if (userData?.role === 'pending' || userData?.status === 'pending') {
+            if (userRole === 'pending') {
                 useAuthStore.setState({
                     user,
                     userId: user.uid,
                     userEmail: user.email,
                     userRole: 'pending',
+                    businessId: businessId,
                     isAuthenticated: true
                 })
                 navigate('/pending-approval')
                 return
             }
 
-            // Step 4: Get business info
+            // Step 4: Get business info (Branches etc)
             let context = await MigrationService.getUserBusinessAndBranch(user.uid)
-
-            if (!context) {
-                // If no business context, and not pending, then something is wrong
-                // or they are an employee without an assignment yet.
-                setError('No business assigned to your account. Please contact your manager.')
-                setLoading(false)
-                return
-            }
 
             // Step 5: Store business and branch context
             const assignedBranches = context.branches?.map(branch => ({
@@ -74,7 +77,7 @@ function Login() {
                 isAuthenticated: true,
                 userId: user.uid,
                 userEmail: user.email,
-                userRole: 'owner'
+                userRole: context.role || 'owner'
             })
 
             console.log('✅ Login successful. Business:', context.businessId, 'Branch:', context.branchId)

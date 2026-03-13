@@ -12,7 +12,8 @@ import {
     deleteDoc,
     serverTimestamp,
     query,
-    where
+    where,
+    collectionGroup
 } from 'firebase/firestore'
 
 function Employees() {
@@ -31,39 +32,24 @@ function Employees() {
 
     const [branches, setBranches] = useState([])
 
-    // Fetch pending users from pending_users collection
-    const fetchPendingUsers = async () => {
+    // Fetch employees (Both Active and Pending) from GLOBAL users collection
+    const fetchApprovedEmployees = async () => {
+        if (!businessId) return
         try {
-            const snapshot = await getDocs(collection(db, 'pending_users'))
+            // Query global users collection where businessId matches
+            const usersQuery = query(collection(db, 'users'), where('businessId', '==', businessId))
+            const snapshot = await getDocs(usersQuery)
+            
             const list = snapshot.docs.map(doc => ({
                 uid: doc.id,
                 ...doc.data()
             }))
-            setPendingUsers(list)
-        } catch (error) {
-            console.error('Error fetching pending users:', error)
-            handleError(error, 'Fetch Pending Users', 'Failed to fetch pending users')
-        }
-    }
-
-    // Fetch approved employees from business_users
-    const fetchApprovedEmployees = async () => {
-        if (!businessId) return
-        try {
-            const snapshot = await getDocs(collection(db, 'business_users', businessId))
-            const list = []
             
-            // For each user document in the business, fetch their profile
-            await Promise.all(snapshot.docs.map(async (userDoc) => {
-                const profileSnap = await getDocs(collection(db, 'business_users', businessId, userDoc.id, 'profile'))
-                profileSnap.forEach(profileDoc => {
-                    list.push({ uid: userDoc.id, ...profileDoc.data() })
-                })
-            }))
-            
-            setActiveEmployees(list)
+            // Separate into active and pending using the role from the master record
+            setActiveEmployees(list.filter(e => e.role !== 'pending'))
+            setPendingUsers(list.filter(e => e.role === 'pending'))
         } catch (error) {
-            console.error('Error fetching approved employees:', error)
+            console.error('Error fetching employees:', error)
             handleError(error, 'Fetch Employees', 'Failed to fetch employee list')
         }
     }
@@ -81,37 +67,39 @@ function Employees() {
 
     useEffect(() => {
         if (businessId) {
-            fetchPendingUsers()
             fetchApprovedEmployees()
             fetchBranches()
         }
     }, [businessId])
 
-    // Approve pending user - move to business_users
+    // Approve pending user
     const handleApprove = async (uid, name, email) => {
         setLoading(true)
         try {
-            if (!businessId) {
-                handleError(null, 'Approve', 'No business context found')
-                setLoading(false)
-                return
-            }
+            if (!businessId) return
 
-            // Create user in business_users as approved employee
+            // Update LOCAL user profile in business_users/{bid}/{uid}/profile
             await setDoc(doc(db, 'business_users', businessId, uid, 'profile'), {
                 uid,
+                businessId,
                 name,
                 email,
                 role: 'cashier',  // Default role
-                assignedBranches: [],
-                createdAt: serverTimestamp()
-            })
+                status: 'active',
+                updatedAt: serverTimestamp()
+            }, { merge: true })
 
-            // Remove from pending_users
-            await deleteDoc(doc(db, 'pending_users', uid))
+            // Update GLOBAL user mapping (Master Record)
+            await setDoc(doc(db, 'users', uid), {
+                uid,
+                businessId,
+                name,
+                email,
+                role: 'cashier',
+                updatedAt: serverTimestamp()
+            }, { merge: true })
 
-            showSuccess(`✅ ${name} approved and added to team!`)
-            await fetchPendingUsers()
+            showSuccess(`✅ ${name} approved!`)
             await fetchApprovedEmployees()
         } catch (err) {
             handleError(err, 'Approve User', 'Failed to approve user')

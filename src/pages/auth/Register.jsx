@@ -26,27 +26,48 @@ function Register() {
             // Update Auth Profile
             await updateProfile(user, { displayName: name })
 
-            // Create pending user record in Firestore
-            console.log('📝 Creating pending account request...')
+            // Step 1: Initialize business context (Fresh Start)
+            console.log('🏗️ Initializing business setup...')
+            const context = await MigrationService.createDefaultBusinessAndBranch(
+                user.uid,
+                `${name}'s Business`,
+                "Main Branch"
+            )
+
+            // Step 2: Create GLOBAL user record (SBS Guide Pattern)
             await setDoc(doc(db, 'users', user.uid), {
                 uid: user.uid,
                 email: email,
                 name: name,
                 role: 'pending',
+                businessId: context.businessId,
+                createdAt: serverTimestamp()
+            })
+
+            // Step 3: Create LOCAL business profile
+            await setDoc(doc(db, 'business_users', context.businessId, user.uid, 'profile'), {
+                uid: user.uid,
+                name: name,
+                email: email,
+                role: 'pending',
+                businessId: context.businessId,
                 status: 'pending',
                 createdAt: serverTimestamp()
             })
 
-            // Update local state to pending
+            // Update local state and redirect to pending screen
             useAuthStore.setState({
                 user,
+                businessId: context.businessId,
+                branchId: context.branchId,
+                branchName: context.branchName,
                 userId: user.uid,
                 userEmail: user.email,
                 userRole: 'pending',
                 isAuthenticated: true
             })
 
-            showSuccess('Registration successful! Awaiting approval.')
+            showSuccess('Registration successful! Awaiting activation.')
             navigate('/pending-approval')
         } catch (err) {
             handleError(err, 'Register', 'Failed to create account')
