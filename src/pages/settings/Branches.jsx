@@ -4,7 +4,7 @@ import FirestoreService from '../../firebase/firestore-multi-branch'
 import './Settings.css'
 
 export default function Branches() {
-    const { businessId, userRole } = useAuthStore()
+    const { businessId, userRole, isOwner } = useAuthStore()
     const [branches, setBranches] = useState([])
     const [loading, setLoading] = useState(true)
     const [showForm, setShowForm] = useState(false)
@@ -20,13 +20,30 @@ export default function Branches() {
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
 
-    // Check if user is owner
-    if (userRole !== 'owner') {
+    // Debug: Log user role
+    useEffect(() => {
+        console.log('🔍 Branches page - userRole:', userRole, 'isOwner:', isOwner())
+    }, [userRole])
+
+    // Check if user is owner (only check after auth is loaded)
+    if (businessId && !isOwner()) {
         return (
             <div className="page-container">
                 <div className="error-box">
-                    ❌ Only business owners can manage branches
+                    ❌ Only business owners can manage branches (Your role: {userRole})
+                    <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                        Please log out and log back in to refresh your permissions.
+                    </p>
                 </div>
+            </div>
+        )
+    }
+
+    // Show loading if no businessId yet
+    if (!businessId) {
+        return (
+            <div className="page-container">
+                <div className="loading">⏳ Loading your business context...</div>
             </div>
         )
     }
