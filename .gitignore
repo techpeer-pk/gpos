@@ -6,9 +6,12 @@ node_modules/
 # Environment Variables (NEVER commit this)
 .env
 .env.local
+.env.development          ← Yeh add karo
+.env.production           ← Yeh bhi add karo
 .env.development.local
 .env.test.local
 .env.production.local
+
 
 # Build Output
 dist/
