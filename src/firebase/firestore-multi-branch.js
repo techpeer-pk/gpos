@@ -1,9 +1,11 @@
 import { db } from './config'
 import {
     collection,
+    collectionGroup,
     addDoc,
     getDocs,
     getDoc,
+    setDoc,
     updateDoc,
     deleteDoc,
     doc,
@@ -553,6 +555,171 @@ export const getBranchWiseRevenue = async (businessId) => {
     }
 }
 
+// ============================================
+// SESSION & INITIALIZATION (Refactored from Migration)
+// ============================================
+
+/**
+ * Initialize a new business and its first branch
+ * Used during registration
+ */
+export const initializeBusiness = async (userId, businessName = "Main Business", branchName = "Main Branch") => {
+    try {
+        const businessId = `business_${Date.now()}`
+        const branchId = `branch_${Date.now()}`
+
+        // Create business document
+        await setDoc(doc(db, 'businesses', businessId), {
+            businessName,
+            owner_uid: userId,
+            createdAt: serverTimestamp(),
+            settings: {
+                currency: 'PKR',
+                timezone: 'Asia/Karachi',
+                language: 'ur'
+            }
+        })
+
+        // Create branch document
+        await setDoc(doc(db, 'businesses', businessId, 'branches', branchId), {
+            branchName,
+            location: '',
+            manager_uid: userId,
+            createdAt: serverTimestamp(),
+            settings: {
+                currency: 'PKR',
+                tax_rate: 0.17,
+                receipt_template: 'detailed',
+                receipt_header: businessName,
+                receipt_footer: branchName
+            }
+        })
+
+        // Create user assignment document (Local Business Profile)
+        await setDoc(doc(db, 'business_users', businessId, userId, 'profile'), {
+            uid: userId,
+            businessId,
+            email: '',
+            role: 'owner',
+            assignedBranches: [branchId],
+            permissions: ['all'],
+            createdAt: serverTimestamp()
+        })
+
+        // Create global user mapping (Master Record)
+        await setDoc(doc(db, 'users', userId), {
+            uid: userId,
+            businessId,
+            role: 'owner',
+            updatedAt: serverTimestamp()
+        })
+
+        return { businessId, branchId, branchName }
+    } catch (error) {
+        console.error('❌ Error initializing business:', error)
+        throw error
+    }
+}
+
+/**
+ * Get the full business and branch context for a user session
+ * Used during login and app hydration
+ */
+export const getUserSessionContext = async (userId) => {
+    try {
+        let businessId = null
+        let userRole = null
+
+        // 1. Check global users collection for mapping
+        const userMapping = await getDoc(doc(db, 'users', userId))
+        if (userMapping.exists()) {
+            businessId = userMapping.data().businessId
+            userRole = userMapping.data().role
+        }
+
+        // 2. Fallback: Search businesses for owner
+        if (!businessId) {
+            const q = query(
+                collection(db, 'businesses'),
+                where('owner_uid', '==', userId)
+            )
+            const querySnap = await getDocs(q)
+            if (!querySnap.empty) {
+                businessId = querySnap.docs[0].id
+                userRole = 'owner'
+            }
+        }
+
+        // 3. Fallback for Cashiers/Managers: Search profile collectionGroup
+        if (!businessId) {
+            const profileQuery = query(
+                collectionGroup(db, 'profile'),
+                where('uid', '==', userId)
+            )
+            const profileSnap = await getDocs(profileQuery)
+            if (!profileSnap.empty) {
+                const profileData = profileSnap.docs[0].data()
+                businessId = profileData.businessId
+                userRole = profileData.role
+            }
+        }
+
+        if (!businessId) return null
+
+        // Get business data
+        const businessDoc = await getDoc(doc(db, 'businesses', businessId))
+        if (!businessDoc.exists()) return null
+
+        // 4. Get User Profile and apply OWNER SAFETY NET
+        const profileSnap = await getDoc(doc(db, 'business_users', businessId, userId, 'profile'))
+        
+        // CRITICAL: Ensure primary owner always has 'owner' role
+        const isPrimaryOwner = businessDoc.data().owner_uid === userId
+        if (isPrimaryOwner) {
+            userRole = 'owner'
+        } else if (profileSnap.exists()) {
+            userRole = profileSnap.data().role
+        }
+
+        // Get all branches for this business
+        const branchesSnap = await getDocs(
+            collection(db, 'businesses', businessId, 'branches')
+        )
+
+        if (branchesSnap.empty) {
+            return { businessId, branchId: null, branchName: null, branches: [], role: userRole }
+        }
+
+        // Aggregate accessible branches
+        let branches = branchesSnap.docs.map(d => ({
+            branchId: d.id,
+            branchName: d.data().branchName,
+            role: userRole
+        }))
+
+        // For cashiers, filter to only assigned branches
+        if (userRole === 'cashier' && profileSnap.exists()) {
+            const assignedBranches = profileSnap.data().assignedBranches || []
+            if (assignedBranches.length > 0) {
+                branches = branches.filter(b => assignedBranches.includes(b.branchId))
+            }
+        }
+
+        const defaultBranch = branches[0] || { branchId: branchesSnap.docs[0].id, branchName: branchesSnap.docs[0].data().branchName }
+
+        return {
+            businessId,
+            branchId: defaultBranch.branchId,
+            branchName: defaultBranch.branchName,
+            branches,
+            role: userRole
+        }
+    } catch (error) {
+        console.error('❌ Error getting session context:', error)
+        return null
+    }
+}
+
 export default {
     // Products
     addProduct, getProducts, getProductById, updateProduct, deleteProduct,
@@ -583,5 +750,7 @@ export default {
     // Batch Operations
     batchAddInventoryItems, batchUpdateSalesWithCashFlow,
     // Aggregation
-    getTotalSalesAcrossAllBranches, getBranchWiseRevenue
+    getTotalSalesAcrossAllBranches, getBranchWiseRevenue,
+    // Session & Context
+    initializeBusiness, getUserSessionContext
 }

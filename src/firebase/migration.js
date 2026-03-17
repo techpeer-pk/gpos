@@ -1,6 +1,7 @@
 import { db } from './config'
 import {
     collection,
+    collectionGroup,
     getDocs,
     getDoc,
     setDoc,
@@ -18,76 +19,8 @@ import {
 
 export const MigrationService = {
     /**
-     * Create default business and branch for existing user
-     * Called after login if user has no business yet
-     */
-    async createDefaultBusinessAndBranch(userId, businessName = "Main Business", branchName = "Main Branch") {
-        try {
-            const businessId = `business_${Date.now()}`
-            const branchId = `branch_${Date.now()}`
-
-            // Create business document
-            await setDoc(doc(db, 'businesses', businessId), {
-                businessName,
-                owner_uid: userId,
-                createdAt: serverTimestamp(),
-                settings: {
-                    currency: 'PKR',
-                    timezone: 'Asia/Karachi',
-                    language: 'ur'
-                }
-            })
-
-            // Create branch document
-            await setDoc(doc(db, 'businesses', businessId, 'branches', branchId), {
-                branchName,
-                location: '',
-                manager_uid: userId,
-                createdAt: serverTimestamp(),
-                settings: {
-                    currency: 'PKR',
-                    tax_rate: 0.17,
-                    receipt_template: 'detailed',
-                    receipt_header: businessName,
-                    receipt_footer: branchName
-                }
-            })
-
-            // Create user assignment document (Local Business Profile)
-            await setDoc(doc(db, 'business_users', businessId, userId, 'profile'), {
-                uid: userId,
-                businessId, // Crucial for collection group queries
-                email: '',
-                role: 'owner',
-                assignedBranches: [branchId],
-                permissions: ['all'],
-                createdAt: serverTimestamp()
-            })
-
-            // Create global user mapping (Master Record)
-            await setDoc(doc(db, 'users', userId), {
-                uid: userId,
-                businessId,
-                role: 'owner',
-                updatedAt: serverTimestamp()
-            })
-
-            console.log(`✅ Created default business (${businessId}) and branch (${branchId})`)
-            return { businessId, branchId, branchName }
-        } catch (error) {
-            console.error('❌ Error creating default business/branch:', error)
-            throw error
-        }
-    },
-
-    /**
      * Migrate all existing data from old structure to new structure
      * CAUTION: This should only be run ONCE per user
-     * 
-     * @param {string} userId - Current user ID
-     * @param {string} businessId - Target business ID
-     * @param {string} branchId - Target branch ID
-     * @returns {object} Migration report with counts
      */
     async migrateExistingData(userId, businessId, branchId) {
         const batch = writeBatch(db)
@@ -262,73 +195,6 @@ export const MigrationService = {
             report.success = false
             report.errors.push(error.message)
             throw error
-        }
-    },
-
-    /**
-     * Check if user has already been migrated
-     * Returns businessId and branchId if exists
-     */
-    async getUserBusinessAndBranch(userId) {
-        try {
-            let businessId = null
-            let userRole = null
-
-            // 1. Check global users collection for mapping
-            const userMapping = await getDoc(doc(db, 'users', userId))
-            if (userMapping.exists()) {
-                businessId = userMapping.data().businessId
-            }
-
-            // 2. Fallback: Search businesses for owner
-            if (!businessId) {
-                const q = query(
-                    collection(db, 'businesses'),
-                    where('owner_uid', '==', userId)
-                )
-                const querySnap = await getDocs(q)
-                if (!querySnap.empty) {
-                    businessId = querySnap.docs[0].id
-                }
-            }
-
-            if (!businessId) return null
-
-            // 3. Get User Profile from business_users/{bid}/{uid}/profile
-            const profileSnap = await getDoc(doc(db, 'business_users', businessId, userId, 'profile'))
-            if (profileSnap.exists()) {
-                userRole = profileSnap.data().role
-            }
-
-            // Get business data
-            const businessDoc = await getDoc(doc(db, 'businesses', businessId))
-            if (!businessDoc.exists()) return null
-            const businessData = businessDoc.data()
-
-            // Get first available branch
-            const branchesSnap = await getDocs(
-                collection(db, 'businesses', businessId, 'branches')
-            )
-
-            if (branchesSnap.empty) {
-                return { businessId, branchId: null, branchName: null, branches: [], role: userRole }
-            }
-
-            // Get all branches for user
-            const branches = branchesSnap.docs.map(doc => ({
-                branchId: doc.id,
-                branchName: doc.data().branchName,
-                location: doc.data().location
-            }))
-
-            const firstBranch = branchesSnap.docs[0]
-            const branchId = firstBranch.id
-            const branchName = firstBranch.data().branchName
-
-            return { businessId, branchId, branchName, branches, role: userRole }
-        } catch (error) {
-            console.error('❌ Error getting user business:', error)
-            return null
         }
     },
 

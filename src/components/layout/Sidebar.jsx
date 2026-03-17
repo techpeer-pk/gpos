@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { logout } from '../../firebase/auth'
 import { useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import useAuthStore from '../../store/authStore-multi-branch'
 
 const menuItems = [
@@ -46,11 +46,17 @@ function Sidebar({ isOpen, setIsOpen }) {
         { title: 'Help', paths: ['/documentation', '/help', '/user-settings'] },
     ]
 
-    const [openGroups, setOpenGroups] = useState(() => {
+    const [openGroups, setOpenGroups] = useState({})
+
+    // Automatically expand groups when role is owner
+    useEffect(() => {
         const initial = {}
-        menuGroups.forEach(g => { initial[g.title] = g.title === 'Main' })
-        return initial
-    })
+        const shouldExpand = userRole === 'owner'
+        menuGroups.forEach(g => { 
+            initial[g.title] = shouldExpand || g.title === 'Main' 
+        })
+        setOpenGroups(initial)
+    }, [userRole])
 
     const handleLogout = async () => {
         await logout()

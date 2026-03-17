@@ -45,7 +45,7 @@ function Employees() {
             const bizUsersSnapshot = await getDocs(bizUsersQuery)
             const activeList = bizUsersSnapshot.docs
                 .map(doc => ({ uid: doc.id, ...doc.data() }))
-                .filter(u => u.role !== 'pending')
+                .filter(u => u.role !== 'pending' && u.uid !== useAuthStore.getState().userId) // Hide self (owner)
             
             setActiveEmployees(activeList)
 
@@ -91,13 +91,18 @@ function Employees() {
         try {
             if (!businessId) return
 
+            // Protective check: Don't allow demoting an owner
+            const bizDoc = await FirestoreService.getBusiness(businessId)
+            const isPrimaryOwner = bizDoc.exists() && bizDoc.data().owner_uid === uid
+            const targetRole = isPrimaryOwner ? 'owner' : 'cashier'
+
             // Update LOCAL user profile in business_users/{bid}/{uid}/profile
             await setDoc(doc(db, 'business_users', businessId, uid, 'profile'), {
                 uid,
                 businessId,
                 name,
                 email,
-                role: 'cashier',  // Default role
+                role: targetRole,  
                 status: 'active',
                 updatedAt: serverTimestamp()
             }, { merge: true })
@@ -108,7 +113,7 @@ function Employees() {
                 businessId,
                 name,
                 email,
-                role: 'cashier',
+                role: targetRole,
                 updatedAt: serverTimestamp()
             }, { merge: true })
 
@@ -148,12 +153,29 @@ function Employees() {
                 return
             }
             
+            // Protective check: Don't allow demoting an owner
+            const bizDoc = await FirestoreService.getBusiness(businessId)
+            const isPrimaryOwner = bizDoc.exists() && bizDoc.data().owner_uid === form.uid
+            const targetRole = isPrimaryOwner ? 'owner' : form.role
+
+            // Write local business profile
             await setDoc(doc(db, 'business_users', businessId, form.uid, 'profile'), {
                 uid: form.uid,
+                businessId,       // Critical: needed for collectionGroup lookup at login
                 name: form.name,
                 email: form.email,
-                role: form.role,
+                role: targetRole,
                 assignedBranches: form.assignedBranches || [],
+                updatedAt: serverTimestamp()
+            }, { merge: true })
+
+            // Write global user mapping - required for all roles to pass canAccessBusiness
+            await setDoc(doc(db, 'users', form.uid), {
+                uid: form.uid,
+                businessId,
+                name: form.name,
+                email: form.email,
+                role: targetRole,
                 updatedAt: serverTimestamp()
             }, { merge: true })
             

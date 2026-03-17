@@ -2,7 +2,7 @@ import { Navigate } from 'react-router-dom'
 import useAuthStore from '../store/authStore-multi-branch'
 
 function ProtectedRoute({ children, allowedRoles }) {
-    const { user, loading } = useAuthStore()
+    const { user, loading, userRole } = useAuthStore()
 
     if (loading) return (
         <div className="min-h-screen bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center fixed inset-0 z-[9999]">
@@ -14,8 +14,6 @@ function ProtectedRoute({ children, allowedRoles }) {
     if (!user) {
         return <Navigate to="/login" />
     }
-
-    const { userRole } = useAuthStore()
 
     if (allowedRoles && !allowedRoles.includes(userRole)) {
         return <Navigate to="/dashboard" />

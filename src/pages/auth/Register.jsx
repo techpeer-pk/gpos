@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { auth, db } from '../../firebase/config'
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { MigrationService } from '../../firebase/migration'
+import { initializeBusiness } from '../../firebase/firestore-multi-branch'
 import useAuthStore from '../../store/authStore-multi-branch'
 import { handleError, showSuccess } from '../../utils/errorHandler'
 
@@ -26,9 +26,9 @@ function Register() {
             // Update Auth Profile
             await updateProfile(user, { displayName: name })
 
-            // Step 1: Initialize business context (Fresh Start)
+            // Step 1: Initialize business context (Initialization)
             console.log('🏗️ Initializing business setup...')
-            const context = await MigrationService.createDefaultBusinessAndBranch(
+            const context = await initializeBusiness(
                 user.uid,
                 `${name}'s Business`,
                 "Main Branch"

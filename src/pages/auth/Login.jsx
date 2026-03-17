@@ -3,10 +3,9 @@ import { useNavigate, Link } from 'react-router-dom'
 import { auth, db } from '../../firebase/config'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
-import FirestoreService from '../../firebase/firestore-multi-branch'
+import FirestoreService, { getUserSessionContext } from '../../firebase/firestore-multi-branch'
 import useAuthStore from '../../store/authStore-multi-branch'
 import { handleError, showSuccess } from '../../utils/errorHandler'
-import { MigrationService } from '../../firebase/migration'
 
 function Login() {
     const [email, setEmail] = useState('')
@@ -55,9 +54,15 @@ function Login() {
                 return
             }
 
-            // Step 4: Get business & branches context
-            let context = await MigrationService.getUserBusinessAndBranch(user.uid)
+            // Step 4: Get business & branches context (Session Context)
+            let context = await getUserSessionContext(user.uid)
             
+            if (!context) {
+                setError('Failed to load business context. Please contact support.')
+                setLoading(false)
+                return
+            }
+
             const branches = context.branches?.map(branch => ({
                 branchId: branch.branchId,
                 branchName: branch.branchName,
@@ -73,11 +78,11 @@ function Login() {
             // Step 5: Decision - Show Branch Selection or Auto-Login
             if (branches.length > 1) {
                 setAvailableBranches(branches)
-                setLoginContext({ ...context, user })
+                setLoginContext({ ...context, user, userRole })
                 setShowBranchSelect(true)
             } else {
                 // Auto-login to the only branch
-                completeLogin(user, context, branches[0])
+                completeLogin(user, context, branches[0], userRole)
             }
         } catch (err) {
             console.error('❌ Login error:', err)
@@ -87,7 +92,10 @@ function Login() {
         }
     }
 
-    const completeLogin = (user, context, selectedBranch) => {
+    const completeLogin = (user, context, selectedBranch, role) => {
+        // PRIORITY: Use the role verified by MigrationService (which has the owner safety net)
+        // This allows recovery if the global users document was corrupted
+        const finalRole = context.role || role
         useAuthStore.setState({
             user,
             businessId: context.businessId,
@@ -97,7 +105,7 @@ function Login() {
             isAuthenticated: true,
             userId: user.uid,
             userEmail: user.email,
-            userRole: context.role || 'owner'
+            userRole: finalRole
         })
         showSuccess(`Welcome back to ${selectedBranch.branchName}!`)
         navigate('/dashboard')
@@ -117,7 +125,7 @@ function Login() {
                         {availableBranches.map((branch) => (
                             <button
                                 key={branch.branchId}
-                                onClick={() => completeLogin(loginContext.user, loginContext, branch)}
+                                onClick={() => completeLogin(loginContext.user, loginContext, branch, loginContext.userRole)}
                                 className="w-full text-left p-4 rounded-2xl border border-gray-100 hover:border-blue-500 hover:bg-blue-50 transition-all group"
                             >
                                 <div className="flex justify-between items-center">

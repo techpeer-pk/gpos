@@ -45,13 +45,41 @@ function App() {
   useEffect(() => {
     initTheme()
     const unsubscribe = onAuthChange(async (currentUser) => {
-      // Sync basic user info - business and branch context is 
-      // maintained via persist middleware in authStore-multi-branch
-      setUser(currentUser)
-      setLoading(false)
+      try {
+        if (currentUser) {
+          setUser(currentUser)
+
+          // Step 1: Force context sync on mount/refresh
+          // This applies the OWNER SAFETY NET globally
+          const { getUserSessionContext } = await import('./firebase/firestore-multi-branch')
+          const context = await getUserSessionContext(currentUser.uid)
+
+          if (context) {
+            console.log(`🔐 Session Synced: User=${currentUser.uid} Role=${context.role} Biz=${context.businessId}`)
+            
+            // Restore full state including the correctly forced 'owner' role
+            useAuthStore.setState({
+              businessId: context.businessId,
+              branchId: useAuthStore.getState().branchId || context.branchId,
+              branchName: useAuthStore.getState().branchName || context.branchName,
+              userRole: context.role || 'cashier', 
+              assignedBranches: context.branches || []
+            })
+          } else {
+            console.warn(`⚠️ No session context found for ${currentUser.uid}`)
+          }
+        } else {
+          setUser(null)
+          useAuthStore.setState({ userRole: 'cashier', businessId: null, branchId: null })
+        }
+      } catch (error) {
+        console.error('❌ Session Sync Critical Error:', error)
+      } finally {
+        setLoading(false)
+      }
     })
     return () => unsubscribe()
-  }, [setUser, setLoading])
+  }, [setUser, setLoading, initTheme])
 
   if (loading) {
     return (
