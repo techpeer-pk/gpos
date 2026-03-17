@@ -9,6 +9,11 @@
 ![Status](https://img.shields.io/badge/status-In%20Development-yellow.svg)
 
 ---
+## 🌐 Live Demo
+👉 **[https://gpos-web.web.app](https://gpos-web.web.app)**
+
+> Test credentials: Email: `admin@gpos.com` | Password: `admin123`
+---
 
 ## ✨ Features
 
