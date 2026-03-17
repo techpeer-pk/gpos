@@ -12,7 +12,7 @@
 ## 🌐 Live Demo
 👉 **[https://gpos-web.web.app](https://gpos-web.web.app)**
 
-> Test credentials: Email: `admin@gpos.com` | Password: `admin123`
+> Test credentials (Admin): Email & Password: `admin@gpos.com` | (Demo): Email & Password: `demo@gpos.com`  
 ---
 
 ## ✨ Features
