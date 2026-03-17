@@ -46,17 +46,13 @@ function Sidebar({ isOpen, setIsOpen }) {
         { title: 'Help', paths: ['/documentation', '/help', '/user-settings'] },
     ]
 
-    const [openGroups, setOpenGroups] = useState({})
-
-    // Automatically expand groups when role is owner
-    useEffect(() => {
+    const [openGroups, setOpenGroups] = useState(() => {
         const initial = {}
-        const shouldExpand = userRole === 'owner'
         menuGroups.forEach(g => { 
-            initial[g.title] = shouldExpand || g.title === 'Main' 
+            initial[g.title] = g.title === 'Main' 
         })
-        setOpenGroups(initial)
-    }, [userRole])
+        return initial
+    })
 
     const handleLogout = async () => {
         await logout()
