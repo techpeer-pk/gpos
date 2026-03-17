@@ -10,9 +10,9 @@
 
 ---
 ## 🌐 Live Demo
-👉 **[https://gpos-web.web.app](https://gpos-web.web.app)**
+👉 **[https://gpos-dev-cx.web.app](https://gpos-dev-cx.web.app)**
 
-> Test credentials: Email: `admin@gpos.com` | Password: `admin123`
+> Test credentials (Admin): Email & Password: `owner@gpos.com` | (Demo): Email & Password: `demo@gpos.com`  
 ---
 
 ## ✨ Features
