@@ -35,6 +35,11 @@ function Products() {
     const [page, setPage] = useState(1)
     const [rowsPerPage, setRowsPerPage] = useState(25)
 
+    // Category Modal State
+    const [showCategoryModal, setShowCategoryModal] = useState(false)
+    const [newCategoryName, setNewCategoryName] = useState('')
+    const [categoryLoading, setCategoryLoading] = useState(false)
+
     const { businessId, branchId } = useAuthStore()
 
     // Resolve category ID to name
@@ -64,7 +69,7 @@ function Products() {
                 stock: inventoryList.find(i => i.productId === p.id)?.quantity || 0
             }))
             setProducts(mergedList)
-            
+
             // Default settings (simulated for now as specific business settings aren't in a global doc anymore)
             setSettings({ currency: 'PKR' })
         } catch (err) {
@@ -144,7 +149,7 @@ function Products() {
             try {
                 // Delete product and inventory (hierarchically)
                 await FirestoreService.deleteProduct(businessId, id)
-                
+
                 // Note: In hierarchical structure, inventory is per branch. 
                 // We should ideally delete inventory for ALL branches, but here we delete for the current context.
                 // Or better, if FirestoreService.deleteProduct is implemented to clean up, use it.
@@ -159,6 +164,28 @@ function Products() {
             } catch (err) {
                 handleError(err, 'Delete Product')
             }
+        }
+    }
+
+    // Add Category
+    const handleCategorySubmit = async (e) => {
+        e.preventDefault()
+        if (!newCategoryName.trim()) return
+
+        setCategoryLoading(true)
+        try {
+            await FirestoreService.addCategory(businessId, {
+                name: newCategoryName.trim(),
+                createdAt: serverTimestamp()
+            })
+            setNewCategoryName('')
+            setShowCategoryModal(false)
+            showSuccess('Category added successfully')
+            fetchProducts() // Refresh categories
+        } catch (err) {
+            handleError(err, 'Add Category', 'Failed to add category')
+        } finally {
+            setCategoryLoading(false)
         }
     }
 
@@ -246,16 +273,26 @@ function Products() {
                         </div>
                         <div>
                             <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1 block">Category</label>
-                            <select
-                                value={form.category}
-                                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                                className="w-full border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                            >
-                                <option value="">Select Category</option>
-                                {categories.map(cat => (
-                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                ))}
-                            </select>
+                            <div className="flex gap-2">
+                                <select
+                                    value={form.category}
+                                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                                    className="flex-1 border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                >
+                                    <option value="">Select Category</option>
+                                    {categories.map(cat => (
+                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCategoryModal(true)}
+                                    className="px-3 bg-gray-100 dark:bg-gray-800 border dark:border-gray-700 rounded-xl text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                    title="Add New Category"
+                                >
+                                    +
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1 block">Sale Price *</label>
@@ -342,16 +379,26 @@ function Products() {
                             </div>
                             <div>
                                 <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1 block">Category</label>
-                                <select
-                                    value={editingProduct.category}
-                                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
-                                    className="w-full border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                                >
-                                    <option value="">Select Category</option>
-                                    {categories.map(cat => (
-                                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                    ))}
-                                </select>
+                                <div className="flex gap-2">
+                                    <select
+                                        value={editingProduct.category}
+                                        onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                                        className="flex-1 border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                    >
+                                        <option value="">Select Category</option>
+                                        {categories.map(cat => (
+                                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                        ))}
+                                    </select>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCategoryModal(true)}
+                                        className="px-3 bg-gray-100 dark:bg-gray-800 border dark:border-gray-700 rounded-xl text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                                        title="Add New Category"
+                                    >
+                                        +
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1 block">Sale Price *</label>
@@ -558,6 +605,48 @@ function Products() {
                     </div>
                 </div>
             </div>
+
+            {/* Add Category Modal */}
+            {showCategoryModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[60] transition-all animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-2xl w-full max-w-md border dark:border-gray-800 border-gray-100">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-black text-gray-800 dark:text-gray-100 uppercase tracking-tight">New Category</h3>
+                            <button onClick={() => setShowCategoryModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">✕</button>
+                        </div>
+                        <form onSubmit={handleCategorySubmit} className="space-y-6">
+                            <div>
+                                <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1 block">Category Name *</label>
+                                <input
+                                    type="text"
+                                    required
+                                    autoFocus
+                                    value={newCategoryName}
+                                    onChange={(e) => setNewCategoryName(e.target.value)}
+                                    className="w-full border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                    placeholder="e.g. Beverages"
+                                />
+                            </div>
+                            <div className="flex gap-3 justify-end pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCategoryModal(false)}
+                                    className="px-6 py-2 border dark:border-gray-700 rounded-xl text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={categoryLoading}
+                                    className="px-8 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-500/20"
+                                >
+                                    {categoryLoading ? 'Saving...' : 'Save Category'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
         </Layout>
     )
