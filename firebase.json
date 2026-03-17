@@ -1,4 +1,7 @@
 {
+    "firestore": {
+        "rules": "firestore.rules"
+    },
     "hosting": {
         "site": "gpos-dev-cx",
         "public": "dist",
