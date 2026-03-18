@@ -22,11 +22,11 @@ import {
  */
 const getCollectionPath = (businessId, branchId, collectionName) => {
     const branchSpecific = ['sales', 'inventory', 'suspended_sales', 'cash_flow']
-    
+
     if (branchSpecific.includes(collectionName)) {
         return `businesses/${businessId}/branches/${branchId}/${collectionName}`
     }
-    
+
     // Shared collections
     return `businesses/${businessId}/${collectionName}`
 }
@@ -460,7 +460,7 @@ export const deleteBranch = (businessId, branchId) => {
 
 export const batchAddInventoryItems = (businessId, branchId, items) => {
     const batch = writeBatch(db)
-    
+
     items.forEach((item) => {
         const docId = `${item.productId}_inv`
         batch.set(doc(db, `businesses/${businessId}/branches/${branchId}/inventory/${docId}`), {
@@ -469,25 +469,25 @@ export const batchAddInventoryItems = (businessId, branchId, items) => {
             createdAt: serverTimestamp()
         })
     })
-    
+
     return batch.commit()
 }
 
 export const batchUpdateSalesWithCashFlow = (businessId, branchId, saleData, cashFlowData) => {
     const batch = writeBatch(db)
-    
+
     // Add sale
     batch.set(
         doc(db, `businesses/${businessId}/branches/${branchId}/sales`, saleData.id),
         saleData
     )
-    
+
     // Add cash flow
     batch.set(
         doc(db, `businesses/${businessId}/branches/${branchId}/cash_flow`, cashFlowData.id),
         cashFlowData
     )
-    
+
     return batch.commit()
 }
 
@@ -534,7 +534,7 @@ export const getBranchWiseRevenue = async (businessId) => {
             const salesSnap = await getDocs(
                 collection(db, `businesses/${businessId}/branches/${branchDoc.id}/sales`)
             )
-            
+
             let revenue = 0
             salesSnap.forEach((saleDoc) => {
                 revenue += (saleDoc.data().finalAmount || 0)
@@ -672,7 +672,7 @@ export const getUserSessionContext = async (userId) => {
 
         // 4. Get User Profile and apply OWNER SAFETY NET
         const profileSnap = await getDoc(doc(db, 'business_users', businessId, userId, 'profile'))
-        
+
         // CRITICAL: Ensure primary owner always has 'owner' role
         const isPrimaryOwner = businessDoc.data().owner_uid === userId
         if (isPrimaryOwner) {
@@ -698,7 +698,7 @@ export const getUserSessionContext = async (userId) => {
         }))
 
         // For cashiers, filter to only assigned branches
-        if (userRole === 'cashier' && profileSnap.exists()) {
+        if (userRole === 'cashier' || userRole === 'manager' && profileSnap.exists()) {
             const assignedBranches = profileSnap.data().assignedBranches || []
             if (assignedBranches.length > 0) {
                 branches = branches.filter(b => assignedBranches.includes(b.branchId))
