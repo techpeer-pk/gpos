@@ -37,22 +37,23 @@ function Employees() {
         if (!businessId) return
         try {
             // 1. Fetch ALL users for THIS business and filter for ACTIVE
-            // (Avoids composite index requirement for businessId + role != pending)
             const bizUsersQuery = query(
-                collection(db, 'users'), 
+                collection(db, 'users'),
                 where('businessId', '==', businessId)
             )
             const bizUsersSnapshot = await getDocs(bizUsersQuery)
             const activeList = bizUsersSnapshot.docs
                 .map(doc => ({ uid: doc.id, ...doc.data() }))
-                .filter(u => u.role !== 'pending' && u.uid !== useAuthStore.getState().userId) // Hide self (owner)
-            
+                // .filter(u => u.role !== 'pending' && u.uid !== useAuthStore.getState().userId)
+                .filter(u => u.role !== 'pending')  // ✅ Fixed: only filter out pending, keep all active including self
+
             setActiveEmployees(activeList)
 
-            // 2. Fetch ALL PENDING users (Global Pool)
+            // 2. FIX BUG 2: Fetch ONLY pending users for THIS business (not global pool)
             const pendingQuery = query(
-                collection(db, 'users'), 
-                where('role', '==', 'pending')
+                collection(db, 'users'),
+                where('role', '==', 'pending'),
+                where('businessId', '==', businessId)
             )
             const pendingSnapshot = await getDocs(pendingQuery)
             const pendingList = pendingSnapshot.docs.map(doc => ({
@@ -60,7 +61,7 @@ function Employees() {
                 ...doc.data()
             }))
             setPendingUsers(pendingList)
-            
+
         } catch (error) {
             console.error('Error fetching employees:', error)
             handleError(error, 'Fetch Employees', 'Failed to fetch employee list')
@@ -91,29 +92,29 @@ function Employees() {
         try {
             if (!businessId) return
 
-            // Protective check: Don't allow demoting an owner
             const bizDoc = await FirestoreService.getBusiness(businessId)
             const isPrimaryOwner = bizDoc.exists() && bizDoc.data().owner_uid === uid
             const targetRole = isPrimaryOwner ? 'owner' : 'cashier'
 
-            // Update LOCAL user profile in business_users/{bid}/{uid}/profile
+            // Update LOCAL user profile
             await setDoc(doc(db, 'business_users', businessId, uid, 'profile'), {
                 uid,
                 businessId,
                 name,
                 email,
-                role: targetRole,  
+                role: targetRole,
                 status: 'active',
                 updatedAt: serverTimestamp()
             }, { merge: true })
 
-            // Update GLOBAL user mapping (Master Record)
+            // Update GLOBAL user mapping
             await setDoc(doc(db, 'users', uid), {
                 uid,
                 businessId,
                 name,
                 email,
                 role: targetRole,
+                assignedBranches: [], // ✅ New: initialize assignedBranches for approved users
                 updatedAt: serverTimestamp()
             }, { merge: true })
 
@@ -127,15 +128,17 @@ function Employees() {
     }
 
     // Reject pending user
+    // FIX BUG 1: fetchPendingUsers() → fetchApprovedEmployees()
+    // FIX BUG 4: 'pending_users' collection → 'users' collection
     const handleRejectPending = async (uid, name) => {
         if (!window.confirm(`Reject ${name}? They will need to register again.`)) {
             return
         }
         try {
             setLoading(true)
-            await deleteDoc(doc(db, 'pending_users', uid))
-            showSuccess(`❌ ${name} rejected`)
-            await fetchPendingUsers()
+            await deleteDoc(doc(db, 'users', uid))  // ✅ Fixed: correct collection
+            showSuccess(`${name} rejected`)
+            await fetchApprovedEmployees()           // ✅ Fixed: correct function name
         } catch (err) {
             handleError(err, 'Reject User', 'Failed to reject user')
         } finally {
@@ -152,8 +155,7 @@ function Employees() {
                 setLoading(false)
                 return
             }
-            
-            // Protective check: Don't allow demoting an owner
+
             const bizDoc = await FirestoreService.getBusiness(businessId)
             const isPrimaryOwner = bizDoc.exists() && bizDoc.data().owner_uid === form.uid
             const targetRole = isPrimaryOwner ? 'owner' : form.role
@@ -161,7 +163,7 @@ function Employees() {
             // Write local business profile
             await setDoc(doc(db, 'business_users', businessId, form.uid, 'profile'), {
                 uid: form.uid,
-                businessId,       // Critical: needed for collectionGroup lookup at login
+                businessId,
                 name: form.name,
                 email: form.email,
                 role: targetRole,
@@ -169,16 +171,17 @@ function Employees() {
                 updatedAt: serverTimestamp()
             }, { merge: true })
 
-            // Write global user mapping - required for all roles to pass canAccessBusiness
+            // Write global user mapping
             await setDoc(doc(db, 'users', form.uid), {
                 uid: form.uid,
                 businessId,
                 name: form.name,
                 email: form.email,
                 role: targetRole,
+                assignedBranches: form.assignedBranches || [], // ✅ New: save assigned branches to global mapping
                 updatedAt: serverTimestamp()
             }, { merge: true })
-            
+
             setForm({ uid: '', name: '', email: '', role: 'cashier', assignedBranches: [] })
             setShowForm(false)
             showSuccess('Employee saved successfully')
@@ -190,8 +193,9 @@ function Employees() {
         }
     }
 
+    // FIX BUG 3: Added `name` parameter to handleDelete
     const handleDelete = async (uid, name) => {
-        if (!window.confirm(`Remove ${name} from team?`)) {
+        if (!window.confirm(`Remove ${name} from team?`)) {  // ✅ Fixed: name now works
             return
         }
         try {
@@ -205,7 +209,6 @@ function Employees() {
             setLoading(false)
         }
     }
-
 
     return (
         <Layout title="Employee Management">
@@ -319,6 +322,9 @@ function Employees() {
                         <div className="col-span-2">
                             <label className="text-sm text-gray-600 block mb-2">Assigned Branches</label>
                             <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto p-3 border rounded-lg bg-gray-50">
+                                {branches.length === 0 && (
+                                    <p className="text-xs text-gray-400 col-span-2 text-center py-2">No branches found</p>
+                                )}
                                 {branches.map(branch => (
                                     <label key={branch.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-100 p-1 rounded">
                                         <input
@@ -363,64 +369,74 @@ function Employees() {
             <h3 className="text-lg font-bold text-gray-800 mb-4">Active Staff</h3>
 
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <table className="w-full">
-                    <thead className="bg-gray-50 border-b">
-                        <tr>
-                            <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Employee</th>
-                            <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Email</th>
-                            <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Role</th>
-                            <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {activeEmployees.map((emp) => (
-                            <tr key={emp.uid} className="hover:bg-gray-50">
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold text-sm">
-                                            {emp.name?.charAt(0).toUpperCase()}
-                                        </div>
-                                        <span className="font-medium text-gray-800">{emp.name}</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-gray-500 text-sm">{emp.email}</td>
-                                <td className="px-6 py-4">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${emp.role === 'admin' ? 'bg-red-100 text-red-600' :
-                                        emp.role === 'manager' ? 'bg-blue-100 text-blue-600' :
-                                            'bg-green-100 text-green-600'
-                                        }`}>
-                                        {emp.role}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex gap-3">
-                                        <button
-                                            onClick={() => {
-                                                setForm({ 
-                                                    uid: emp.uid, 
-                                                    name: emp.name, 
-                                                    email: emp.email, 
-                                                    role: emp.role,
-                                                    assignedBranches: emp.assignedBranches || []
-                                                })
-                                                setShowForm(true)
-                                            }}
-                                            className="text-blue-600 hover:text-blue-800 text-sm"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(emp.uid)}
-                                            className="text-red-500 hover:text-red-700 text-sm"
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
-                                </td>
+                {activeEmployees.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">
+                        <p className="text-4xl mb-3">👥</p>
+                        <p className="font-medium">No active employees yet</p>
+                        <p className="text-sm mt-1">Add employees or approve pending requests above</p>
+                    </div>
+                ) : (
+                    <table className="w-full">
+                        <thead className="bg-gray-50 border-b">
+                            <tr>
+                                <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Employee</th>
+                                <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Email</th>
+                                <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Role</th>
+                                <th className="text-left px-6 py-3 text-sm font-medium text-gray-500">Actions</th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {activeEmployees.map((emp) => (
+                                <tr key={emp.uid} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold text-sm">
+                                                {emp.name?.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="font-medium text-gray-800">{emp.name}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-500 text-sm">{emp.email}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${
+                                            emp.role === 'owner'   ? 'bg-red-100 text-red-600' :
+                                            emp.role === 'manager' ? 'bg-blue-100 text-blue-600' :
+                                                                     'bg-green-100 text-green-600'
+                                        }`}>
+                                            {emp.role}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={() => {
+                                                    setForm({
+                                                        uid: emp.uid,
+                                                        name: emp.name,
+                                                        email: emp.email,
+                                                        role: emp.role,
+                                                        assignedBranches: emp.assignedBranches || []
+                                                    })
+                                                    setShowForm(true)
+                                                }}
+                                                className="text-blue-600 hover:text-blue-800 text-sm"
+                                            >
+                                                Edit
+                                            </button>
+                                            {/* FIX BUG 3: Pass emp.name to handleDelete */}
+                                            <button
+                                                onClick={() => handleDelete(emp.uid, emp.name)}
+                                                className="text-red-500 hover:text-red-700 text-sm"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
             </div>
 
         </Layout>
