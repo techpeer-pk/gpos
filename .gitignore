@@ -15,7 +15,9 @@ node_modules/
 
 # Build Output
 dist/
+dev-dist/
 build/
+.firebase/
 
 # Firebase
 .firebase/
