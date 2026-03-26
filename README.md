@@ -518,7 +518,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 ## 👨‍💻 Author
 
 **Syed Aneel Raza**
-*Full Stack Developer | Firebase Enthusiast*
+*AI Generalist | Full Stack Developer | Firebase Enthusiast*
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/syedaneelraza)
 [![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Silverado313)
