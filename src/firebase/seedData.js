@@ -186,14 +186,19 @@ export const generateSeedData = {
     /**
      * Generate sample inventory for branch
      */
-    inventory: (productIds = []) => {
-        return productIds.map((productId, index) => ({
-            productId,
-            quantity: Math.floor(Math.random() * 50) + 10,
-            reorderLevel: 5,
-            lastRestocked: new Date(),
-            location: `Shelf-${String.fromCharCode(65 + (index % 5))}-${index}`
-        }))
+    inventory: (productIds = [], products = []) => {
+        return productIds.map((productId, index) => {
+            const product = products.find(p => p.id === productId) || {}
+            return {
+                productId,
+                productName: product.name || `Product ${index + 1}`,
+                quantity: Math.floor(Math.random() * 50) + 10,
+                minThreshold: 15, // Alert when below this
+                lastRestocked: new Date(),
+                location: `Shelf-${String.fromCharCode(65 + (index % 5))}-${index}`,
+                updatedAt: new Date()
+            }
+        })
     },
 
     /**

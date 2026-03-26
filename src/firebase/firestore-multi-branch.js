@@ -9,6 +9,8 @@ import {
     updateDoc,
     deleteDoc,
     doc,
+    arrayUnion,
+    increment,
     query,
     where,
     serverTimestamp,
@@ -96,7 +98,7 @@ export const updateInventory = (businessId, branchId, docId, data) => {
 
 export const decrementInventory = (businessId, branchId, docId, quantity) => {
     return updateDoc(doc(db, `businesses/${businessId}/branches/${branchId}/inventory/${docId}`), {
-        quantity: FieldValue.increment(-quantity),
+        quantity: increment(-quantity),
         updatedAt: serverTimestamp()
     })
 }
@@ -153,7 +155,7 @@ export const updateCustomer = (businessId, customerId, data) => {
 
 export const incrementCustomerLoyalty = (businessId, customerId, points) => {
     return updateDoc(doc(db, `businesses/${businessId}/customers/${customerId}`), {
-        loyaltyPoints: FieldValue.increment(points)
+        loyaltyPoints: increment(points)
     })
 }
 
@@ -724,6 +726,21 @@ export const getUserSessionContext = async (userId) => {
     }
 }
 
+/**
+ * Store FCM token for a specific user
+ */
+export const saveUserFcmToken = async (businessId, userId, token) => {
+    try {
+        const userProfileRef = doc(db, 'business_users', businessId, userId, 'profile');
+        await updateDoc(userProfileRef, {
+            fcmTokens: arrayUnion(token),
+            lastTokenUpdate: serverTimestamp()
+        });
+    } catch (error) {
+        console.error('❌ Error saving FCM token:', error);
+    }
+}
+
 export default {
     // Products
     addProduct, getProducts, getProductById, updateProduct, deleteProduct,
@@ -756,5 +773,7 @@ export default {
     // Aggregation
     getTotalSalesAcrossAllBranches, getBranchWiseRevenue,
     // Session & Context
-    initializeBusiness, getUserSessionContext
+    initializeBusiness, getUserSessionContext,
+    // Messaging
+    saveUserFcmToken
 }

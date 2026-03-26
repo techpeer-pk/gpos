@@ -3,6 +3,8 @@ import { logout } from '../../firebase/auth'
 import { useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import useAuthStore from '../../store/authStore-multi-branch'
+import { requestNotificationPermission } from '../../firebase/messaging'
+import toast from 'react-hot-toast'
 
 const menuItems = [
     { path: '/dashboard', icon: '📊', label: 'Dashboard', roles: ['owner', 'manager', 'cashier'] },
@@ -30,8 +32,20 @@ const menuItems = [
 
 function Sidebar({ isOpen, setIsOpen }) {
     const navigate = useNavigate()
-    const { userRole, branchName, assignedBranches, switchBranch } = useAuthStore()
+    const { user, businessId, userRole, branchName, assignedBranches, switchBranch } = useAuthStore()
     const [showBranchDropdown, setShowBranchDropdown] = useState(false)
+    const [notifLoading, setNotifLoading] = useState(false)
+
+    const handleEnableNotifications = async () => {
+        setNotifLoading(true)
+        const token = await requestNotificationPermission(businessId, user.uid)
+        if (token) {
+            toast.success('Notifications enabled successfully!')
+        } else {
+            toast.error('Could not enable notifications. Please check browser settings.')
+        }
+        setNotifLoading(false)
+    }
 
     const filteredMenu = menuItems.filter(item =>
         !item.roles || item.roles.includes(userRole)
@@ -153,8 +167,16 @@ function Sidebar({ isOpen, setIsOpen }) {
                 })}
             </nav>
 
-            {/* Logout */}
-            <div className="p-4 border-t border-gray-700 dark:border-gray-800">
+            {/* Notifications & Logout */}
+            <div className="p-4 border-t border-gray-700 dark:border-gray-800 space-y-2">
+                <button
+                    onClick={handleEnableNotifications}
+                    disabled={notifLoading}
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-blue-400 hover:bg-blue-600/10 transition w-full text-sm font-medium border border-blue-900/30"
+                >
+                    <span className="text-lg">{notifLoading ? '⌛' : '🔔'}</span>
+                    {notifLoading ? 'Enabling...' : 'Enable Alerts'}
+                </button>
                 <button
                     onClick={handleLogout}
                     className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-500 hover:bg-red-600 hover:text-white transition w-full text-sm font-medium"

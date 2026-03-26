@@ -1,13 +1,13 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
-import { Toaster } from 'react-hot-toast'
 import ErrorBoundary from './components/common/ErrorBoundary'
 import { onAuthChange } from './firebase/auth'
-import { db } from './firebase/config'
 import { doc, getDoc } from 'firebase/firestore'
 import ProtectedRoute from './routes/ProtectedRoute'
 import useAuthStore from './store/authStore-multi-branch'
 import useThemeStore from './store/themeStore'
+import { onMessageListener } from './firebase/messaging'
+import toast, { Toaster } from 'react-hot-toast'
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
 import PendingApproval from './pages/auth/PendingApproval'
@@ -37,6 +37,7 @@ import RegisterReconciliation from './pages/accounts/RegisterReconciliation'
 import POInvoice from './pages/inventory/POInvoice'
 import PublicDocumentation from './pages/public/PublicDocumentation'
 import Purpose from './pages/public/Purpose'
+import NotificationListener from './components/common/NotificationListener'
 
 function App() {
   const { user, setUser, loading, setLoading } = useAuthStore()
@@ -81,6 +82,37 @@ function App() {
     return () => unsubscribe()
   }, [setUser, setLoading, initTheme])
 
+  // Foreground Messaging Listener
+  useEffect(() => {
+    onMessageListener()
+      .then((payload) => {
+        toast.custom((t) => (
+          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <span className="text-2xl">🔔</span>
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-bold text-gray-900">{payload.notification.title}</p>
+                  <p className="mt-1 text-sm text-gray-500">{payload.notification.body}</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex border-l border-gray-200">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-bold text-blue-600 hover:text-blue-500 focus:outline-none"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        ), { duration: 5000 });
+      })
+      .catch((err) => console.log('failed: ', err));
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center z-[9999]">
@@ -94,6 +126,7 @@ function App() {
   return (
     <ErrorBoundary>
       <Toaster position="top-right" reverseOrder={false} />
+      <NotificationListener />
       <Routes>
         <Route path="/" element={<PublicDocumentation />} />
         <Route path="/pricing" element={<Pricing />} />

@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
+import { getMessaging } from 'firebase/messaging'
 import { 
     initializeFirestore, 
     persistentLocalCache, 
@@ -27,4 +28,6 @@ export const db = initializeFirestore(app, {
     experimentalForceLongPolling: true, // Maintain compatibility for strict network environments
 })
 
-export default app
+export const messaging = getMessaging(app)
+
+export default app
