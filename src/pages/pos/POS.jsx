@@ -6,6 +6,7 @@ import useAuthStore from '../../store/authStore-multi-branch'
 import { handleError, showSuccess } from '../../utils/errorHandler'
 import { serverTimestamp } from 'firebase/firestore'
 import { generateReceiptMessage, getWhatsAppLink, getSMSLink } from '../../utils/receiptHelper'
+import SearchableDropdown from '../../components/common/SearchableDropdown'
 
 // ─── Cart Panel — defined OUTSIDE POS so it never remounts on parent re-render
 const CartPanel = memo(({
@@ -30,21 +31,14 @@ const CartPanel = memo(({
                     onClick={() => setMobileCartOpen(false)}
                 >✕</button>
             </div>
-            <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">Customer</label>
-                <select
-                    className="w-full text-sm border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={selectedCustomer?.id || ''}
-                    onChange={(e) => {
-                        const customer = customers.find(c => c.id === e.target.value)
-                        setSelectedCustomer(customer || null)
-                    }}
-                >
-                    <option value="">Walk-in Customer</option>
-                    {customers.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.phone})</option>
-                    ))}
-                </select>
+            <div className="mt-2">
+                <SearchableDropdown
+                    label="Customer"
+                    options={customers}
+                    value={selectedCustomer}
+                    onChange={setSelectedCustomer}
+                    placeholder="Search by name or phone..."
+                />
             </div>
         </div>
 
