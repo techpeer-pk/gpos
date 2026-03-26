@@ -236,27 +236,29 @@ http://localhost:5173
 
 ---
 
-## Step 10: Create Your Admin Account
+## Step 10: Create Your Owner Account (Admin)
 
-After registering, your account will be "pending" by default. Follow these steps to make yourself an Admin.
+After registering, your account will be "pending" by default. As the first user, you must manually set yourself as the **Owner** in the database.
 
 ### Register in the app:
-1. Click **"Register"** on the login page
-2. Fill in your name, email and password
-3. Click Register — you will see a **"Pending Approval"** screen
+1. Click **"Register"** on the login page.
+2. Fill in your name, email, and password.
+3. Click **"Request Access"** — you will see a **"Pending Approval"** screen.
 
-### Approve yourself as Admin in Firebase:
-1. Go to Firebase Console in your browser
-2. Click **"Build"** > **"Firestore Database"**
-3. Click on the **"users"** collection
-4. Click on your user document (it shows your email)
-5. Hover your mouse over `role: "pending"` — a pencil icon appears
-6. Click the pencil icon
-7. Delete `"pending"` and type `admin`
-8. Click **"Update"**
-9. Go back to the app and press **F5** to refresh
+### Approve yourself as Owner in Firebase:
+1. Go to Firebase Console > **Firestore Database**.
+2. **First Task (Master Record):**
+   - Click the **"users"** collection.
+   - Click your user ID.
+   - Change `role: "pending"` to `role: "owner"`.
+3. **Second Task (Business Profile):**
+   - Click the **"business_users"** collection.
+   - Drildown: `business_id` > `your_uid` > **"profile"**.
+   - Change `role: "pending"` to `role: "owner"`.
+   - Change `status: "pending"` to `status: "active"`.
+4. Go back to the app and press **F5** to refresh.
 
-✅ You now have full Admin access to GPOS!
+✅ You now have full **Owner** access to your GPOS business!
 
 ---
 
@@ -285,9 +287,9 @@ Then open browser at: **http://localhost:5173**
 
 | Role | Permissions |
 |------|------------|
-| Admin | Full access to everything |
-| Manager | All features except employee management |
-| Cashier | POS and sales only |
+| Owner | Full access to all branches, reports, and settings. |
+| Manager | Full access to a specific branch (except employee deletion). |
+| Cashier | POS and sales operations only (locked to one branch). |
 
 ---
 
@@ -298,7 +300,7 @@ Then open browser at: **http://localhost:5173**
 | App shows blank white screen | Firebase .env values are missing or wrong. Check Step 8. |
 | `npm install` fails | Use: `npm install --legacy-peer-deps` |
 | Login not working | Make sure Authentication > Email/Password is Enabled in Firebase |
-| Stuck on Pending screen | Change your role to `admin` in Firestore (Step 10) |
+| Stuck on Pending screen | Change your role to `owner` in **both** `users` and `business_users` collections (Step 10) |
 | Port already in use | Close other CMD windows and try again |
 
 ---
