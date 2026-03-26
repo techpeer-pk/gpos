@@ -205,6 +205,10 @@ export const getSales = (businessId, branchId) => {
     )
 }
 
+export const getSale = (businessId, branchId, saleId) => {
+    return getDoc(doc(db, `businesses/${businessId}/branches/${branchId}/sales/${saleId}`))
+}
+
 export const getSalesForDate = (businessId, branchId, startDate, endDate) => {
     const q = query(
         collection(db, `businesses/${businessId}/branches/${branchId}/sales`),
@@ -732,7 +736,7 @@ export default {
     // Suppliers
     addSupplier, getSuppliers, updateSupplier, deleteSupplier,
     // Sales
-    addSale, getSales, getSalesForDate, updateSale, deleteSale,
+    addSale, getSales, getSale, getSalesForDate, updateSale, deleteSale,
     // Suspended Sales
     addSuspendedSale, getSuspendedSales, getSuspendedSaleById, updateSuspendedSale, deleteSuspendedSale,
     // Cash Flow

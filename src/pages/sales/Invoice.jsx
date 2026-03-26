@@ -4,14 +4,15 @@ import { db } from '../../firebase/config'
 import { doc, getDoc } from 'firebase/firestore'
 import { handleError } from '../../utils/errorHandler'
 import { QRCodeCanvas } from 'qrcode.react'
-import useAuthStore from '../../store/authStore'
+import useAuthStore from '../../store/authStore-multi-branch'
+import FirestoreService from '../../firebase/firestore-multi-branch'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { generateReceiptMessage, getWhatsAppLink, getSMSLink } from '../../utils/receiptHelper'
 
 function Invoice() {
     const { id } = useParams()
-    const { user } = useAuthStore()
+    const { user, businessId, branchId } = useAuthStore()
     const navigate = useNavigate()
     const voucherRef = useRef()
     const [sale, setSale] = useState(null)
@@ -64,18 +65,18 @@ function Invoice() {
 
     useEffect(() => {
         const fetchInvoice = async () => {
+            if (!businessId || !branchId) return
             try {
-                // Fetch Sale
-                const saleSnap = await getDoc(doc(db, 'sales', id))
+                // Fetch Sale using multi-branch service
+                const saleSnap = await FirestoreService.getSale(businessId, branchId, id)
                 if (saleSnap.exists()) {
                     setSale({ id: saleSnap.id, ...saleSnap.data() })
                 }
 
-                // Fetch Settings (using a placeholder 'admin' or first user's settings)
-                // In a real app, this would be based on the business owner's ID
-                const settingsSnap = await getDoc(doc(db, 'settings', 'global'))
-                if (settingsSnap.exists()) {
-                    setSettings(settingsSnap.data())
+                // Fetch Branch Settings for branding
+                const branchSnap = await FirestoreService.getBranch(businessId, branchId)
+                if (branchSnap.exists()) {
+                    setSettings(branchSnap.data().settings || {})
                 }
             } catch (err) {
                 handleError(err, 'Fetch Invoice', 'Failed to load invoice')
@@ -83,8 +84,8 @@ function Invoice() {
                 setLoading(false)
             }
         }
-        fetchInvoice()
-    }, [id])
+        if (id) fetchInvoice()
+    }, [id, businessId, branchId])
 
     if (loading) return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
