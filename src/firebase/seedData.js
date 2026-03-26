@@ -109,29 +109,37 @@ export const generateSeedData = {
             phone: '+923001234567',
             email: 'ali.khan@email.com',
             address: 'Karachi, Pakistan',
-            loyaltyPoints: 1500
+            loyaltyPoints: 1500,
+            totalSpent: 45000,
+            totalVisits: 8
         },
         {
             name: 'Fatima Ahmed',
             phone: '+923012345678',
             email: 'fatima.ahmed@email.com',
             address: 'Lahore, Pakistan',
-            loyaltyPoints: 2300
+            loyaltyPoints: 2300,
+            totalSpent: 62000,
+            totalVisits: 12
         },
         {
             name: 'Muhammad Hassan',
             phone: '+923021234567',
             email: 'mhassan@email.com',
             address: 'Islamabad, Pakistan',
-            loyaltyPoints: 800
+            loyaltyPoints: 800,
+            totalSpent: 15000,
+            totalVisits: 3
         },
         {
             name: 'Ayesha Malik',
             phone: '+923031234567',
             email: 'ayesha.malik@email.com',
             address: 'Karachi, Pakistan',
-            loyaltyPoints: 3100
-        }
+            loyaltyPoints: 3100,
+            totalSpent: 89000,
+            totalVisits: 22
+        },
     ],
 
     /**

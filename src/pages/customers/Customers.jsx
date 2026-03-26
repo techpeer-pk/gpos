@@ -292,12 +292,12 @@ function Customers() {
                                         </td>
                                         <td className="px-6 py-5">
                                             <span className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-500 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border border-yellow-100 dark:border-yellow-900/30">
-                                                ⭐ {customer.loyaltyPoints.toLocaleString()} Points
+                                                ⭐ {(customer.loyaltyPoints || 0).toLocaleString()} Points
                                             </span>
                                         </td>
                                         <td className="px-6 py-5">
                                             <div className="flex flex-col">
-                                                <span className="text-green-600 dark:text-green-400 font-black text-sm">PKR {customer.totalSpent.toLocaleString()}</span>
+                                                <span className="text-green-600 dark:text-green-400 font-black text-sm">PKR {(customer.totalSpent || 0).toLocaleString()}</span>
                                                 <span className="text-[9px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-tighter">Gross Expenditure</span>
                                             </div>
                                         </td>
