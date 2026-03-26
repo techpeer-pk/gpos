@@ -2,6 +2,8 @@
  * Seed Data Generator for Multi-Branch Testing
  * Use this to populate test data into Firestore for development
  */
+import { db } from './config'
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
 
 export const generateSeedData = {
     /**
@@ -348,7 +350,7 @@ export const populateTestData = async (businessId, userId, firestoreService) => 
             // Add inventory
             console.log('📊 Adding inventory...')
             const inventory = generateSeedData.inventory(productIds)
-            // await firestoreService.batchAddInventoryItems(businessId, branchId, inventory)
+            await firestoreService.batchAddInventoryItems(businessId, branchId, inventory)
 
             // Add sample sales
             console.log('💰 Adding sample sales...')
@@ -369,6 +371,38 @@ export const populateTestData = async (businessId, userId, firestoreService) => 
                     createdAt: new Date()
                 })
             }
+        }
+        
+        // 6. Add sample staff (Users)
+        console.log('🧑‍🤝‍🧑 Adding sample staff profiles...')
+        const sampleUsers = generateSeedData.users()
+        const branches = await firestoreService.getBranches(businessId)
+        const firstBranchId = branches.docs[0]?.id
+
+        // Add a sample manager and cashier
+        const staffToSeed = [sampleUsers.manager, sampleUsers.cashier]
+        for (const staff of staffToSeed) {
+            const staffUid = `staff_${staff.role}_${Date.now()}`
+            
+            // Create Local Profile
+            await setDoc(doc(db, 'business_users', businessId, staffUid, 'profile'), {
+                ...staff,
+                uid: staffUid,
+                businessId,
+                assignedBranches: [firstBranchId],
+                status: 'active',
+                createdAt: serverTimestamp()
+            })
+
+            // Create Global Record
+            await setDoc(doc(db, 'users', staffUid), {
+                uid: staffUid,
+                businessId,
+                role: staff.role,
+                name: staff.name,
+                email: staff.email,
+                updatedAt: serverTimestamp()
+            })
         }
 
         console.log('✅ Test data population complete!')
