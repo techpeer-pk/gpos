@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import Layout from '../../components/layout/Layout'
 import { db } from '../../firebase/config'
+import useAuthStore from '../../store/authStore-multi-branch'
 import {
     collection,
     getDocs,
@@ -47,6 +48,8 @@ function nowFilename() {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function Backup() {
+    const { businessId, branchId, userRole } = useAuthStore()
+
     // Export state
     const [exportCols, setExportCols] = useState(
         Object.fromEntries(ALL_COLLECTIONS.map(c => [c.id, c.defaultOn]))
@@ -66,6 +69,34 @@ export default function Backup() {
     const [history, setHistory] = useState([])
 
     const logRef = useRef()
+
+    // ── Scope Helper ──────────────────────────────────────────────────────────
+    function getCollectionRef(colId) {
+        if (!businessId) return null
+
+        const branchSpecific = [
+            'inventory', 'sales', 'sales_returns', 'purchase_orders',
+            'expenses', 'cash_flow', 'reconciliations', 'suspended_sales'
+        ]
+
+        if (colId === 'users') {
+            return collection(db, 'business_users', businessId)
+        }
+
+        if (branchSpecific.includes(colId)) {
+            if (!branchId) return null
+            return collection(db, 'businesses', businessId, 'branches', branchId, colId)
+        }
+
+        // Shared business-level collections
+        return collection(db, 'businesses', businessId, colId)
+    }
+
+    function getDocRef(colId, docId) {
+        const colRef = getCollectionRef(colId)
+        if (!colRef) return null
+        return doc(colRef, docId)
+    }
 
     // ── Logging ──────────────────────────────────────────────────────────────
     function addLog(type, msg) {
@@ -109,15 +140,23 @@ export default function Backup() {
         try {
             // First pass — count docs
             for (const col of selected) {
-                const snap = await getDocs(collection(db, col.id))
+                const colRef = getCollectionRef(col.id)
+                if (!colRef) continue
+                const snap = await getDocs(colRef)
                 total += snap.size
             }
             setProgress({ done: 0, total })
             addLog('info', `📊 Found ${total} total documents across ${selected.length} collections`)
+            addLog('info', `🏢 Scope: Business(${businessId}) | Branch(${branchId || 'Global'})`)
 
             // Second pass — export
             for (const col of selected) {
-                const snap = await getDocs(collection(db, col.id))
+                const colRef = getCollectionRef(col.id)
+                if (!colRef) {
+                    addLog('warn', `  ⚠️ Skipping ${col.label} — Path not available in this context`)
+                    continue
+                }
+                const snap = await getDocs(colRef)
                 backup.__collections__[col.id] = {}
 
                 for (const docSnap of snap.docs) {
@@ -232,8 +271,10 @@ export default function Backup() {
 
                     for (const docId of chunk) {
                         const { __collections__, ...cleanData } = docs[docId]
-                        const ref = doc(db, colName, docId)
-                        batch.set(ref, cleanData)
+                        const ref = getDocRef(colName, docId)
+                        if (ref) {
+                            batch.set(ref, cleanData)
+                        }
                     }
 
                     await batch.commit()
@@ -282,6 +323,18 @@ export default function Backup() {
     }
 
     const sc = statusUI[status]
+
+    if (userRole !== 'owner') {
+        return (
+            <Layout>
+                <div className="p-12 text-center">
+                    <div className="text-4xl mb-4">🔐</div>
+                    <h2 className="text-xl font-bold text-gray-800">Access Restricted</h2>
+                    <p className="text-gray-500 mt-2">Only the Business Owner can perform backup or restore operations.</p>
+                </div>
+            </Layout>
+        )
+    }
 
     return (
         <Layout>
