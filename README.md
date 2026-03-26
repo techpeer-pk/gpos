@@ -403,6 +403,21 @@ npm run preview     → Preview production build locally
 *Last Updated: February 24, 2026*
 
 ---
+## 🔮 Future Extension Roadmap
+
+GPOS is designed to be extendable. Planned enhancements include:
+
+1. **Multi-Store Management**:
+    - Extend Firestore schema to include `storeId` in all collections.
+    - Implement a "Store Switcher" in the Header.
+2. **Offline Mode**:
+    - Integrate Service Workers and IndexDB for local cart persistence during internet outages.
+3. **Advanced Analytics**:
+    - Add a `sales_trends` bucket to store pre-aggregated data for faster heavy-duty reports.
+4. **API Integrations**:
+    - Add webhooks for E-commerce sync (Shopify/WooCommerce).
+
+---
 
 ## 🚀 Getting Started
 
