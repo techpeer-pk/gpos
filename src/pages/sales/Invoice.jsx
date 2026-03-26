@@ -11,8 +11,12 @@ import { jsPDF } from 'jspdf'
 import { generateReceiptMessage, getWhatsAppLink, getSMSLink } from '../../utils/receiptHelper'
 
 function Invoice() {
-    const { id } = useParams()
-    const { user, businessId, branchId } = useAuthStore()
+    const { businessId: paramBizId, branchId: paramBranchId, id } = useParams()
+    const { user, businessId: storeBizId, branchId: storeBranchId } = useAuthStore()
+    
+    // Prioritize URL parameters for public access, fallback to store for staff
+    const businessId = paramBizId || storeBizId
+    const branchId = paramBranchId || storeBranchId
     const navigate = useNavigate()
     const voucherRef = useRef()
     const [sale, setSale] = useState(null)
@@ -21,7 +25,7 @@ function Invoice() {
     const [viewMode, setViewMode] = useState('standard') // 'standard' or 'digital'
 
     const handleShare = (method) => {
-        const message = generateReceiptMessage(sale, settings)
+        const message = generateReceiptMessage(sale, settings, businessId, branchId)
         if (method === 'whatsapp') {
             window.open(getWhatsAppLink(sale.customerPhone, message), '_blank')
         } else {
@@ -73,10 +77,25 @@ function Invoice() {
                     setSale({ id: saleSnap.id, ...saleSnap.data() })
                 }
 
-                // Fetch Branch Settings for branding
-                const branchSnap = await FirestoreService.getBranch(businessId, branchId)
+                // Fetch Business and Branch Data for branding
+                const [bizSnap, branchSnap] = await Promise.all([
+                    FirestoreService.getBusiness(businessId),
+                    FirestoreService.getBranch(businessId, branchId)
+                ])
+
                 if (branchSnap.exists()) {
-                    setSettings(branchSnap.data().settings || {})
+                    const branchData = branchSnap.data()
+                    const bizData = bizSnap.exists() ? bizSnap.data() : {}
+                    
+                    // Merge settings: Branch overrides Business
+                    setSettings({
+                        businessName: bizData.businessName || 'GPOS Business',
+                        ...bizData.settings,
+                        ...branchData.settings,
+                        // Priority for Header: branch.receipt_header -> businessName
+                        displayHeader: branchData.settings?.receipt_header || branchData.settings?.receiptHeader || bizData.businessName || 'GPOS Business',
+                        displayFooter: branchData.settings?.receipt_footer || branchData.settings?.receiptFooter || 'Thank you!'
+                    })
                 }
             } catch (err) {
                 handleError(err, 'Fetch Invoice', 'Failed to load invoice')
@@ -154,7 +173,7 @@ function Invoice() {
                     {/* Header */}
                     <div className="text-center border-b pb-6 mb-6">
                         <h1 className="text-3xl font-black text-gray-900 tracking-tight">
-                            {settings?.businessName || 'GPOS Business'}
+                            {settings?.displayHeader || settings?.businessName || 'GPOS Business'}
                         </h1>
                         <p className="text-gray-500 text-sm mt-1 uppercase font-bold tracking-widest italic leading-tight">
                             Official Receipt
@@ -195,8 +214,8 @@ function Invoice() {
                                     <tr key={idx} className="text-sm">
                                         <td className="py-3 font-semibold text-gray-800">{item.name}</td>
                                         <td className="py-3 text-center text-gray-600 font-medium">{item.quantity}</td>
-                                        <td className="py-3 text-right text-gray-600 font-medium">{item.price.toFixed(2)}</td>
-                                        <td className="py-3 text-right font-black text-gray-800">{item.total.toFixed(2)}</td>
+                                        <td className="py-3 text-right text-gray-600 font-medium">{(item.price || 0).toFixed(2)}</td>
+                                        <td className="py-3 text-right font-black text-gray-800">{(item.total || 0).toFixed(2)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -207,28 +226,28 @@ function Invoice() {
                     <div className="border-t-2 border-gray-900 pt-4 space-y-2">
                         <div className="flex justify-between text-sm">
                             <span className="text-gray-500 font-bold uppercase text-[11px]">Subtotal</span>
-                            <span className="font-bold text-gray-800">{sale.currency || 'PKR'} {sale.subtotal.toFixed(2)}</span>
+                            <span className="font-bold text-gray-800">{sale.currency || 'PKR'} {(sale.subtotal || 0).toFixed(2)}</span>
                         </div>
-                        {sale.tax > 0 && (
+                        {(sale.tax || 0) > 0 && (
                             <div className="flex justify-between text-sm">
                                 <span className="text-gray-500 font-bold uppercase text-[11px]">{sale.taxLabel || 'Tax'}</span>
-                                <span className="font-bold text-gray-800">{sale.currency || 'PKR'} {sale.tax.toFixed(2)}</span>
+                                <span className="font-bold text-gray-800">{sale.currency || 'PKR'} {(sale.tax || 0).toFixed(2)}</span>
                             </div>
                         )}
-                        {sale.discount > 0 && (
+                        {(sale.discount || 0) > 0 && (
                             <div className="flex justify-between text-sm text-blue-600">
                                 <span className="font-bold uppercase text-[11px]">Discount</span>
-                                <span className="font-bold">-{sale.currency || 'PKR'} {sale.discount.toFixed(2)}</span>
+                                <span className="font-bold">-{sale.currency || 'PKR'} {(sale.discount || 0).toFixed(2)}</span>
                             </div>
                         )}
                         <div className="flex justify-between items-center py-2 bg-gray-50 rounded px-3 border-l-4 border-blue-600">
                             <span className="font-black text-gray-900 text-lg">Total Amount</span>
-                            <span className="font-black text-gray-900 text-2xl">{sale.currency || 'PKR'} {sale.total.toFixed(2)}</span>
+                            <span className="font-black text-gray-900 text-2xl">{sale.currency || 'PKR'} {(sale.finalAmount || sale.total || sale.subtotal || 0).toFixed(2)}</span>
                         </div>
-                        {sale.paymentMethod === 'cash' && sale.change > 0 && (
+                        {sale.paymentMethod === 'cash' && (sale.change || 0) > 0 && (
                             <div className="flex justify-between text-xs text-green-600 font-bold px-3">
                                 <span>CHANGE RETURNED</span>
-                                <span>{sale.currency || 'PKR'} {sale.change.toFixed(2)}</span>
+                                <span>{sale.currency || 'PKR'} {(sale.change || 0).toFixed(2)}</span>
                             </div>
                         )}
                     </div>
@@ -236,7 +255,7 @@ function Invoice() {
                     {/* Footer Message */}
                     <div className="mt-10 pt-10 border-t border-dashed border-gray-200 text-center">
                         <p className="text-gray-600 font-medium text-sm italic">
-                            "{settings?.receiptFooter || 'Thank you for shopping with us!'}"
+                            "{settings?.displayFooter || settings?.receiptFooter || 'Thank you for shopping with us!'}"
                         </p>
                         <div className="mt-4 flex flex-col items-center">
                             <div className="w-16 h-1 w-full bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
@@ -257,7 +276,7 @@ function Invoice() {
                             </div>
                             <div className="bg-white p-2 rounded-xl shadow-lg ring-4 ring-blue-600/20">
                                 <QRCodeCanvas
-                                    value={`${window.location.origin}/invoice/${sale.id}`}
+                                    value={`${window.location.origin}/invoice/${businessId}/${branchId}/${sale.id}`}
                                     size={64}
                                     level="H"
                                 />
@@ -267,7 +286,7 @@ function Invoice() {
                             <p className="text-blue-300 text-[10px] font-black uppercase tracking-[0.3em] mb-1">Total Bill Amount</p>
                             <p className="text-5xl font-black tracking-tighter">
                                 <span className="text-2xl font-bold opacity-50 mr-2">{sale.currency || 'PKR'}</span>
-                                {sale.total?.toLocaleString()}
+                                {(sale.finalAmount || sale.total || sale.subtotal || 0).toLocaleString()}
                             </p>
                         </div>
                         {/* Decorative background shape */}
@@ -305,9 +324,9 @@ function Invoice() {
                                     <div key={idx} className="flex justify-between items-center text-xs">
                                         <div className="flex flex-col">
                                             <span className="font-bold text-gray-800">{item.name}</span>
-                                            <span className="text-gray-400 text-[10px]">Qty: {item.quantity} × {item.price.toFixed(2)}</span>
+                                            <span className="text-gray-400 text-[10px]">Qty: {item.quantity} × {(item.price || 0).toFixed(2)}</span>
                                         </div>
-                                        <span className="font-black text-gray-900">{sale.currency || 'PKR'} {item.total.toFixed(2)}</span>
+                                        <span className="font-black text-gray-900">{sale.currency || 'PKR'} {(item.total || 0).toFixed(2)}</span>
                                     </div>
                                 ))}
                             </div>
@@ -315,31 +334,38 @@ function Invoice() {
                             <div className="mt-4 pt-4 border-t border-gray-200 border-dashed space-y-2">
                                 <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold">
                                     <span>SUBTOTAL</span>
-                                    <span>{sale.currency || 'PKR'} {sale.subtotal?.toFixed(2)}</span>
+                                    <span>{sale.currency || 'PKR'} {(sale.subtotal || 0).toFixed(2)}</span>
                                 </div>
-                                {sale.tax > 0 && (
+                                {(sale.tax || 0) > 0 && (
                                     <div className="flex justify-between items-center text-[10px] text-gray-400 font-bold">
                                         <span>{sale.taxLabel?.toUpperCase() || 'TAX'}</span>
-                                        <span>{sale.currency || 'PKR'} {sale.tax?.toFixed(2)}</span>
+                                        <span>{sale.currency || 'PKR'} {(sale.tax || 0).toFixed(2)}</span>
                                     </div>
                                 )}
-                                {sale.discount > 0 && (
+                                {(sale.discount || 0) > 0 && (
                                     <div className="flex justify-between items-center text-[10px] text-blue-400 font-bold">
                                         <span>DISCOUNT</span>
-                                        <span>-{sale.currency || 'PKR'} {sale.discount?.toFixed(2)}</span>
+                                        <span>-{sale.currency || 'PKR'} {(sale.discount || 0).toFixed(2)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between items-center pt-2">
                                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Net Payable</span>
-                                    <span className="text-lg font-black text-gray-900">{sale.currency || 'PKR'} {sale.total?.toFixed(2)}</span>
+                                    <span className="text-lg font-black text-gray-900">{sale.currency || 'PKR'} {(sale.finalAmount || sale.total || sale.subtotal || 0).toFixed(2)}</span>
                                 </div>
-                                {sale.paymentMethod === 'cash' && sale.change > 0 && (
+                                {sale.paymentMethod === 'cash' && (sale.change || 0) > 0 && (
                                     <div className="flex justify-between items-center pt-1 border-t border-gray-100 mt-1">
                                         <span className="text-[9px] font-black text-green-600 uppercase">Change Returned</span>
-                                        <span className="text-sm font-black text-green-600">{sale.currency || 'PKR'} {sale.change?.toFixed(2)}</span>
+                                        <span className="text-sm font-black text-green-600">{sale.currency || 'PKR'} {(sale.change || 0).toFixed(2)}</span>
                                     </div>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Footer Message (Digital) */}
+                        <div className="px-8 pb-4 text-center">
+                             <p className="text-gray-400 font-medium text-[10px] italic">
+                                "{settings?.displayFooter || settings?.receiptFooter || 'Thank you for shopping with us!'}"
+                            </p>
                         </div>
 
                         {/* Signatures */}

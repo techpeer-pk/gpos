@@ -115,7 +115,7 @@ function App() {
         <Route path="/user-settings" element={<ProtectedRoute><UserSettings /></ProtectedRoute>} />
         <Route path="/suppliers" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Suppliers /></ProtectedRoute>} />
         <Route path="/purchase-orders" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><PurchaseOrders /></ProtectedRoute>} />
-        <Route path="/invoice/:id" element={<Invoice />} />
+        <Route path="/invoice/:businessId/:branchId/:id" element={<Invoice />} />
         <Route path="/documentation" element={<ProtectedRoute><Documentation /></ProtectedRoute>} />
         <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
         <Route path="/import" element={<ProtectedRoute allowedRoles={['owner']}><Import /></ProtectedRoute>} />

@@ -2,24 +2,27 @@
  * Utility for generating professional receipt messages and sharing links.
  */
 
-const DOMAIN = 'https://gpos-web.web.app';
+const DOMAIN = typeof window !== 'undefined' ? window.location.origin : 'https://gpos-web.web.app';
 
 /**
  * Generates a professional text summary for a sale.
  */
-export const generateReceiptMessage = (sale, settings) => {
+export const generateReceiptMessage = (sale, settings, businessId, branchId) => {
     const businessName = settings?.businessName || 'GPOS Business';
     const currency = sale.currency || 'PKR';
-    const total = sale.total?.toFixed(2);
+    // Handle both 'total' and 'finalAmount' field names defensively
+    const totalAmount = (sale.finalAmount || sale.total || 0).toFixed(2);
     const date = sale.createdAt?.toDate ? sale.createdAt.toDate().toLocaleDateString() : new Date().toLocaleDateString();
-    const invoiceUrl = `${DOMAIN}/invoice/${sale.id}`;
+    
+    // Include business and branch context in the URL for public access
+    const invoiceUrl = `${DOMAIN}/invoice/${businessId || 'biz'}/${branchId || 'branch'}/${sale.id}`;
 
     return `*Receipt from ${businessName}*
 --------------------------
 *Transaction ID:* #${sale.id.slice(-6).toUpperCase()}
 *Date:* ${date}
 *Items:* ${sale.items?.length || 0}
-*Total Amount:* ${currency} ${total}
+*Total Amount:* ${currency} ${totalAmount}
 --------------------------
 View your digital receipt here:
 ${invoiceUrl}

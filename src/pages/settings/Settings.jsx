@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import Layout from '../../components/layout/Layout'
-import { db } from '../../firebase/config'
-import { doc, getDoc, setDoc } from 'firebase/firestore'
+import useAuthStore from '../../store/authStore-multi-branch'
+import FirestoreService from '../../firebase/firestore-multi-branch'
 import { handleError, showSuccess } from '../../utils/errorHandler'
 
 function Settings() {
+    const { businessId, branchId } = useAuthStore()
     const [loading, setLoading] = useState(false)
     const [saved, setSaved] = useState(false)
     const [settings, setSettings] = useState({
@@ -16,35 +17,73 @@ function Settings() {
         taxRate: 0,
         loyaltyEnabled: false,
         loyaltyPointsPerAmount: 1,
-        pointsRedemptionRate: 0.1, // 1 point = 0.1 currency unit
+        pointsRedemptionRate: 0.1,
         receiptFooter: 'Thank you for your business!',
+        receiptHeader: '',
         lowStockAlert: true,
         theme: 'light'
     })
 
-    const settingsId = 'global'
-
     useEffect(() => {
         const fetchSettings = async () => {
+            if (!businessId || !branchId) return
             try {
-                const docRef = doc(db, 'settings', settingsId)
-                const docSnap = await getDoc(docRef)
-                if (docSnap.exists()) {
-                    setSettings(docSnap.data())
-                }
+                const [bizSnap, branchSnap] = await Promise.all([
+                    FirestoreService.getBusiness(businessId),
+                    FirestoreService.getBranch(businessId, branchId)
+                ])
+
+                const bizData = bizSnap.data() || {}
+                const branchData = branchSnap.data() || {}
+                const branchSettings = branchData.settings || {}
+
+                setSettings(prev => ({
+                    ...prev,
+                    businessName: bizData.businessName || '',
+                    businessType: bizData.businessType || 'retail',
+                    currency: branchSettings.currency || bizData.settings?.currency || 'PKR',
+                    taxEnabled: branchSettings.taxEnabled ?? false,
+                    taxLabel: branchSettings.taxLabel || 'Tax',
+                    taxRate: branchSettings.taxRate || 0,
+                    receiptFooter: branchSettings.receipt_footer || branchSettings.receiptFooter || 'Thank you!',
+                    receiptHeader: branchSettings.receipt_header || branchSettings.receiptHeader || bizData.businessName || '',
+                    loyaltyEnabled: bizData.settings?.loyaltyEnabled ?? false,
+                    lowStockAlert: bizData.settings?.lowStockAlert ?? true
+                }))
             } catch (err) {
                 handleError(err, 'Fetch Settings', 'Failed to load settings')
             }
         }
         fetchSettings()
-    }, [settingsId])
+    }, [businessId, branchId])
 
     const handleSave = async () => {
         setLoading(true)
         try {
-            await setDoc(doc(db, 'settings', settingsId), settings)
+            // Updated Business-level settings
+            await FirestoreService.updateBusiness(businessId, {
+                businessName: settings.businessName,
+                businessType: settings.businessType,
+                settings: {
+                    loyaltyEnabled: settings.loyaltyEnabled,
+                    lowStockAlert: settings.lowStockAlert
+                }
+            })
+
+            // Update Branch-level settings
+            await FirestoreService.updateBranch(businessId, branchId, {
+                settings: {
+                    currency: settings.currency,
+                    taxEnabled: settings.taxEnabled,
+                    taxLabel: settings.taxLabel,
+                    taxRate: settings.taxRate,
+                    receipt_header: settings.receiptHeader || settings.businessName,
+                    receipt_footer: settings.receiptFooter
+                }
+            })
+
             setSaved(true)
-            showSuccess('Settings saved successfully')
+            showSuccess('Settings updated for this branch')
             setTimeout(() => setSaved(false), 3000)
         } catch (err) {
             handleError(err, 'Save Settings', 'Failed to save settings')
@@ -195,15 +234,28 @@ function Settings() {
                 {/* Receipt Settings */}
                 <div className="bg-white rounded-xl p-6 shadow-sm">
                     <h3 className="font-bold text-gray-800 mb-4">🧾 Receipt Settings</h3>
-                    <div>
-                        <label className="text-sm text-gray-600">Receipt Footer Message</label>
-                        <textarea
-                            value={settings.receiptFooter}
-                            onChange={(e) => setSettings({ ...settings, receiptFooter: e.target.value })}
-                            className="w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            rows="2"
-                            placeholder="Thank you for your business!"
-                        />
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-sm text-gray-600">Receipt Header (Business Name/Branch Name)</label>
+                            <input
+                                type="text"
+                                value={settings.receiptHeader}
+                                onChange={(e) => setSettings({ ...settings, receiptHeader: e.target.value })}
+                                className="w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Business Name or Branch Name"
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1 italic">This defaults to your Business Name if left blank.</p>
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-600">Receipt Footer Message</label>
+                            <textarea
+                                value={settings.receiptFooter}
+                                onChange={(e) => setSettings({ ...settings, receiptFooter: e.target.value })}
+                                className="w-full border rounded-lg px-3 py-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                rows="2"
+                                placeholder="Thank you for your business!"
+                            />
+                        </div>
                     </div>
                 </div>
 

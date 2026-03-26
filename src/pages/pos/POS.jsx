@@ -17,7 +17,8 @@ const CartPanel = memo(({
     amountPaid, setAmountPaid,
     lastSaleId, lastSaleData, success,
     loading, handleCheckout, handleHoldSale, clearCart,
-    setMobileCartOpen, updateQty, removeFromCart, handleShare
+    setMobileCartOpen, updateQty, removeFromCart, handleShare,
+    businessId, branchId
 }) => (
     <>
         {/* Cart Header */}
@@ -142,7 +143,7 @@ const CartPanel = memo(({
                     </div>
                     <div className="flex flex-col gap-2 w-full">
                         <button
-                            onClick={() => window.open(`/invoice/${lastSaleId}`, '_blank')}
+                            onClick={() => window.open(`/invoice/${businessId}/${branchId}/${lastSaleId}`, '_blank')}
                             className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-black text-xs uppercase tracking-widest hover:bg-blue-700 transition shadow-md flex items-center gap-2 w-full justify-center"
                         ><span>📜</span> View Full Invoice</button>
 
@@ -214,7 +215,7 @@ function POS() {
     const currency = settings?.currency || 'PKR'
 
     const handleShare = (method, sale) => {
-        const message = generateReceiptMessage(sale, settings)
+        const message = generateReceiptMessage(sale, settings, businessId, branchId)
         if (method === 'whatsapp') {
             window.open(getWhatsAppLink(sale.customerPhone, message), '_blank')
         } else {
@@ -242,8 +243,26 @@ function POS() {
                 setCategories(categoryList)
                 setCustomers(customerSnap.docs.map(d => ({ id: d.id, ...d.data() })))
                 
-                // Set default settings (no global settings collection in new structure)
-                setSettings({ currency: 'PKR', taxLabel: 'Tax', loyaltyPointsPerAmount: 1 })
+                // Fetch Settings from Business and Branch
+                const [bizSnap, branchSnap] = await Promise.all([
+                    FirestoreService.getBusiness(businessId),
+                    FirestoreService.getBranch(businessId, branchId)
+                ])
+
+                const bizData = bizSnap.exists() ? bizSnap.data() : {}
+                const branchData = branchSnap.exists() ? branchSnap.data() : {}
+                const branchSettings = branchData.settings || {}
+
+                const mergedSettings = {
+                    businessName: bizData.businessName || 'GPOS Business',
+                    ...bizData.settings,
+                    ...branchSettings,
+                    receipt_header: branchSettings.receipt_header || branchSettings.receiptHeader || bizData.businessName,
+                    receipt_footer: branchSettings.receipt_footer || branchSettings.receiptFooter || 'Thank you!'
+                }
+
+                setSettings(mergedSettings)
+                setTaxEnabled(mergedSettings.taxEnabled ?? true)
                 
                 // Get suspended sales for this branch
                 const suspSnap = await FirestoreService.getSuspendedSales(businessId, branchId)
@@ -485,7 +504,8 @@ function POS() {
         amountPaid, setAmountPaid,
         lastSaleId, success, loading,
         handleCheckout, handleHoldSale, clearCart,
-        setMobileCartOpen, updateQty, removeFromCart
+        setMobileCartOpen, updateQty, removeFromCart, handleShare,
+        businessId, branchId
     }
 
     return (

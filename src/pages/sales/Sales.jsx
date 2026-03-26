@@ -31,8 +31,24 @@ function Sales() {
         setLoading(true)
         try {
             // Get sales for current branch
-            const salesSnap = await FirestoreService.getSales(businessId, branchId)
-            setSettings({ currency: 'PKR' })
+            const [salesSnap, bizSnap, branchSnap] = await Promise.all([
+                FirestoreService.getSales(businessId, branchId),
+                FirestoreService.getBusiness(businessId),
+                FirestoreService.getBranch(businessId, branchId)
+            ])
+
+            const bizData = bizSnap.exists() ? bizSnap.data() : {}
+            const branchData = branchSnap.exists() ? branchSnap.data() : {}
+            const branchSettings = branchData.settings || {}
+
+            setSettings({
+                businessName: bizData.businessName || 'GPOS Business',
+                ...bizData.settings,
+                ...branchSettings,
+                receipt_header: branchSettings.receipt_header || branchSettings.receiptHeader || bizData.businessName,
+                receipt_footer: branchSettings.receipt_footer || branchSettings.receiptFooter || 'Thank you!'
+            })
+
             const list = salesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
             setSales(list)
         } catch (err) {
@@ -89,7 +105,7 @@ function Sales() {
         return timestamp.toDate().toLocaleString()
     }
 
-    const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0)
+    const totalRevenue = sales.reduce((sum, s) => sum + (s.finalAmount || s.total || 0), 0)
 
     // ── Interactive Table Logic ──────────────────────────────
     const handleSort = (col) => {
@@ -121,7 +137,7 @@ function Sales() {
                 aVal = a.createdAt?.toMillis?.() || 0
                 bVal = b.createdAt?.toMillis?.() || 0
             } else if (sortCol === 'total') {
-                aVal = a.total || 0; bVal = b.total || 0
+                aVal = a.finalAmount || a.total || 0; bVal = b.finalAmount || b.total || 0
             } else if (sortCol === 'items') {
                 aVal = a.items?.length || 0; bVal = b.items?.length || 0
             } else if (sortCol === 'method') {
@@ -289,7 +305,7 @@ function Sales() {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex flex-col">
-                                                    <span className="font-black text-gray-900 dark:text-gray-100 text-sm">{sale.currency || 'PKR'} {sale.total?.toLocaleString()}</span>
+                                                    <span className="font-black text-gray-900 dark:text-gray-100 text-sm">{sale.currency || 'PKR'} {(sale.finalAmount || sale.total || 0).toLocaleString()}</span>
                                                     {sale.status === 'returned' && (
                                                         <span className="text-[10px] text-red-500 font-black uppercase">Returned</span>
                                                     )}
@@ -302,7 +318,7 @@ function Sales() {
                                                         className="text-blue-600 dark:text-blue-400 hover:text-blue-800 text-xs font-black uppercase tracking-widest"
                                                     >Detail</button>
                                                     <button
-                                                        onClick={() => window.open(`/invoice/${sale.id}`, '_blank')}
+                                                        onClick={() => window.open(`/invoice/${businessId}/${branchId}/${sale.id}`, '_blank')}
                                                         className="text-gray-600 dark:text-gray-400 hover:text-blue-600 font-black text-[10px] uppercase bg-gray-100 dark:bg-gray-800 px-2 py-1.5 rounded-lg border dark:border-gray-700 transition"
                                                     >📜 Receipt</button>
                                                 </div>
@@ -384,30 +400,30 @@ function Sales() {
                         <div className="border-t dark:border-gray-800 pt-6 space-y-2">
                             <div className="flex justify-between text-xs font-bold text-gray-500 dark:text-gray-400">
                                 <span className="uppercase tracking-widest">Subtotal</span>
-                                <span>{selected.currency || 'PKR'} {selected.subtotal?.toFixed(2)}</span>
+                                <span>{selected.currency || 'PKR'} {(selected.subtotal || 0).toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between text-xs font-bold text-gray-500 dark:text-gray-400">
                                 <span className="uppercase tracking-widest">{selected.taxLabel || 'Tax'}</span>
-                                <span>{selected.currency || 'PKR'} {selected.tax?.toFixed(2)}</span>
+                                <span>{selected.currency || 'PKR'} {(selected.tax || 0).toFixed(2)}</span>
                             </div>
-                            {selected.discount > 0 && (
+                            {(selected.discount || 0) > 0 && (
                                 <div className="flex justify-between text-xs font-black text-blue-600 dark:text-blue-400">
                                     <span className="uppercase tracking-widest">Discount Applied</span>
-                                    <span>-{selected.currency || 'PKR'} {selected.discount?.toFixed(2)}</span>
+                                    <span>-{selected.currency || 'PKR'} {(selected.discount || 0).toFixed(2)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between font-black text-gray-900 dark:text-gray-100 border-t dark:border-gray-800 pt-4 text-xl">
                                 <span className="uppercase tracking-tighter">Net Total</span>
-                                <span className="text-blue-600 dark:text-blue-400">{selected.currency || 'PKR'} {selected.total?.toFixed(2)}</span>
+                                <span className="text-blue-600 dark:text-blue-400">{selected.currency || 'PKR'} {(selected.finalAmount || selected.total || selected.subtotal || 0).toFixed(2)}</span>
                             </div>
                             <div className="pt-4 space-y-1">
                                 <div className="flex justify-between text-[11px] font-bold text-gray-500 dark:text-gray-400 italic">
                                     <span>Paid Amount</span>
-                                    <span>{selected.currency || 'PKR'} {selected.amountPaid?.toFixed(2)}</span>
+                                    <span>{selected.currency || 'PKR'} {(selected.amountPaid || 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between text-[11px] font-bold text-green-600 dark:text-green-400 italic">
                                     <span>Change Returned</span>
-                                    <span>{selected.currency || 'PKR'} {selected.change?.toFixed(2)}</span>
+                                    <span>{selected.currency || 'PKR'} {(selected.change || 0).toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
@@ -426,20 +442,28 @@ function Sales() {
                                 <div className="grid grid-cols-2 gap-2">
                                     <button
                                         onClick={() => {
-                                            const msg = generateReceiptMessage(selected, settings)
+                                            const msg = generateReceiptMessage(selected, settings, businessId, branchId)
                                             window.open(getWhatsAppLink(selected.customerPhone, msg), '_blank')
                                         }}
                                         className="bg-green-600 text-white py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-green-700 transition flex items-center justify-center gap-2"
                                     ><span>📱</span> WhatsApp</button>
                                     <button
                                         onClick={() => {
-                                            const msg = generateReceiptMessage(selected, settings)
+                                            const msg = generateReceiptMessage(selected, settings, businessId, branchId)
                                             window.location.href = getSMSLink(selected.customerPhone, msg)
                                         }}
                                         className="bg-gray-800 text-white py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-900 transition flex items-center justify-center gap-2"
                                     ><span>💬</span> SMS</button>
                                 </div>
                             )}
+                            
+                            {/* Full Invoice Link */}
+                            <button
+                                onClick={() => window.open(`/invoice/${businessId}/${branchId}/${selected.id}`, '_blank')}
+                                className="w-full bg-blue-50 text-blue-600 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-100 transition border border-blue-100 flex items-center justify-center gap-2"
+                            >
+                                <span>📄</span> View Full Web Invoice
+                            </button>
                         </div>
 
                         {selected.status !== 'returned' && (user?.role === 'admin' || user?.role === 'manager') && (
