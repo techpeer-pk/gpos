@@ -224,7 +224,7 @@ function Login() {
                 </div>
 
                 <p className="text-center text-gray-400 text-sm mt-6">
-                    GPOS v1.0 — Powered by Firebase 🔥
+                    GPOS v2.0.0 — Modern Multi-Branch POS 🔥
                 </p>
             </div>
         </div>

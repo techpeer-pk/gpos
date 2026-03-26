@@ -51,7 +51,7 @@ function Documentation() {
                     <div className="bg-blue-600 p-8 text-white relative overflow-hidden">
                         <div className="relative z-10">
                             <h1 className="text-3xl font-black uppercase tracking-tight">GPOS Manual</h1>
-                            <p className="text-blue-100 font-bold opacity-80 italic">Version 1.0.0 — Production Ready</p>
+                            <p className="text-blue-100 font-bold opacity-80 italic">Version 2.0.0 — Modern Architecture</p>
                         </div>
                         <div className="absolute top-0 right-0 p-12 text-9xl opacity-10 font-black pointer-events-none">DOCS</div>
                     </div>
