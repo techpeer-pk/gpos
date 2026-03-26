@@ -27,6 +27,7 @@ ui-debug.log
 firebase.json
 .firebaserc
 firestore.rules
+firebase-messaging-sw.js
 
 
 # Logs
