@@ -26,6 +26,7 @@ export default function Pricing() {
                                 G
                             </div>
                             <span className="text-xl font-black tracking-tight text-gray-900 dark:text-gray-100 group-hover:text-blue-600 transition-colors">GPOS<span className="text-blue-600">.</span></span>
+                            <span className="ml-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/40 text-[10px] font-black text-blue-600 dark:text-blue-400 rounded-md border border-blue-100 dark:border-blue-800">v2.0.0</span>
                         </Link>
                     </div>
 
@@ -96,7 +97,7 @@ export default function Pricing() {
                         Simple Pricing.<br /><span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">No Surprises.</span>
                     </h1>
                     <p className="text-xl text-gray-500 dark:text-gray-400 font-medium leading-relaxed max-w-2xl mx-auto mb-4">
-                        Professional Point of Sale software built for small businesses. Start free, scale when you're ready.
+                        Professional **Multi-Branch** Point of Sale software built for small businesses. Start free, scale when you're ready.
                     </p>
                     <p className="text-sm text-amber-600 dark:text-amber-400 font-black uppercase tracking-widest">⚡ No monthly lock-in. Cancel anytime.</p>
                 </div>

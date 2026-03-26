@@ -91,6 +91,7 @@ export default function Purpose() {
                                 G
                             </div>
                             <span className="text-xl font-black tracking-tight text-gray-900 dark:text-gray-100 group-hover:text-blue-600 transition-colors">GPOS<span className="text-blue-600">.</span></span>
+                            <span className="ml-2 px-2 py-0.5 bg-blue-50 dark:bg-blue-900/40 text-[10px] font-black text-blue-600 dark:text-blue-400 rounded-md border border-blue-100 dark:border-blue-800">v2.0.0</span>
                         </Link>
                     </div>
 
@@ -168,7 +169,7 @@ export default function Purpose() {
                         Built for <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Every Business.</span>
                     </h1>
                     <p className="text-xl text-gray-500 dark:text-gray-400 font-medium leading-relaxed max-w-2xl mx-auto">
-                        Whether you're running a boutique, a bustling restaurant, or a specialized clinic, GPOS provides the tools to streamline your operations and grow your revenue.
+                        Whether you're running a boutique, a bustling restaurant, or a specialized clinic, GPOS v2.0 provides the tools to streamline your **Multi-Branch** operations and grow your revenue.
                     </p>
                 </div>
             </header>
