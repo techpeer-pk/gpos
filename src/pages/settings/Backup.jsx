@@ -2,6 +2,8 @@ import { useState, useRef } from 'react'
 import Layout from '../../components/layout/Layout'
 import { db } from '../../firebase/config'
 import useAuthStore from '../../store/authStore-multi-branch'
+import { populateTestData } from '../../firebase/seedData'
+import firestoreService from '../../firebase/firestore-multi-branch'
 import {
     collection,
     getDocs,
@@ -295,6 +297,37 @@ export default function Backup() {
         }
     }
 
+    // ── Seed Data ────────────────────────────────────────────────────────────
+    async function startSeeding() {
+        const confirmed = window.confirm(
+            "This will populate your business with sample products, categories, customers, and staff. Continue?"
+        )
+        if (!confirmed) return
+
+        setRunning(true)
+        resetLog()
+        addLog('info', "🌱 Initiating Seed Data process...")
+
+        try {
+            const result = await populateTestData(businessId, 'owner', firestoreService, (type, msg) => {
+                addLog(type, msg)
+            })
+
+            if (result.success) {
+                setStatus('done')
+                addLog('done', `✨ Seeding Complete: ${result.summary.products} products, ${result.summary.categories} categories created.`)
+            } else {
+                setStatus('error')
+                addLog('error', `❌ Seeding Failed: ${result.error}`)
+            }
+        } catch (err) {
+            setStatus('error')
+            addLog('error', `❌ Critical Error: ${err.message}`)
+        } finally {
+            setRunning(false)
+        }
+    }
+
     // ── Re-download from history ──────────────────────────────────────────────
     function reDownload(item) {
         const blob = new Blob([item.data], { type: 'application/json' })
@@ -467,6 +500,35 @@ export default function Backup() {
                                 className="w-full py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-40 transition"
                             >
                                 {running ? '⏳ Importing...' : '⬆️ Restore / Import'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── SEED DATA ────────────────────────────────────────── */}
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mb-6">
+                    <div className="bg-purple-600 px-5 py-3 flex items-center justify-between">
+                        <div>
+                            <h2 className="text-white font-bold text-sm uppercase tracking-widest">🧪 Seed Test Data</h2>
+                            <p className="text-purple-100 text-xs mt-0.5">Populate sample data for testing purposes</p>
+                        </div>
+                        <span className="bg-purple-500 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-tighter border border-purple-400">DEV ONLY</span>
+                    </div>
+                    <div className="p-5 flex flex-col md:flex-row items-center gap-5">
+                        <div className="flex-1">
+                            <p className="text-sm text-gray-600 leading-relaxed">
+                                Get started quickly by populating your business with <strong>5 sample products</strong>, categories, customers, 
+                                and <strong>staff accounts</strong>. This will also seed initial inventory and sample sales 
+                                across all your branches.
+                            </p>
+                        </div>
+                        <div className="w-full md:w-auto">
+                            <button
+                                onClick={startSeeding}
+                                disabled={running}
+                                className="w-full md:w-48 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 disabled:opacity-40 transition shadow-sm"
+                            >
+                                {running ? '⏳ Seeding...' : '🧪 Seed Test Data'}
                             </button>
                         </div>
                     </div>

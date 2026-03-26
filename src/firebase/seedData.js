@@ -294,12 +294,17 @@ export const generateSeedData = {
  * import { populateTestData } from '@/firebase/seedData'
  * await populateTestData('business-id-123', 'owner-uid')
  */
-export const populateTestData = async (businessId, userId, firestoreService) => {
+export const populateTestData = async (businessId, userId, firestoreService, logger = null) => {
+    const log = (type, msg) => {
+        console.log(`${type.toUpperCase()}: ${msg}`);
+        if (logger) logger(type, msg);
+    }
+
     try {
-        console.log('🌱 Starting test data population...')
+        log('info', '🌱 Starting test data population...')
 
         // 1. Add categories
-        console.log('📂 Adding categories...')
+        log('info', '📂 Adding categories...')
         const categories = generateSeedData.categories()
         let categoryIds = {}
         for (const cat of categories) {
@@ -308,7 +313,7 @@ export const populateTestData = async (businessId, userId, firestoreService) => 
         }
 
         // 2. Add products
-        console.log('📦 Adding products...')
+        log('info', '📦 Adding products...')
         const products = generateSeedData.products()
         let productIds = []
         for (const product of products) {
@@ -324,14 +329,14 @@ export const populateTestData = async (businessId, userId, firestoreService) => 
         }
 
         // 3. Add suppliers
-        console.log('🚚 Adding suppliers...')
+        log('info', '🚚 Adding suppliers...')
         const suppliers = generateSeedData.suppliers()
         for (const supplier of suppliers) {
             await firestoreService.addSupplier(businessId, supplier)
         }
 
         // 4. Add customers
-        console.log('👥 Adding customers...')
+        log('info', '👥 Adding customers...')
         const customers = generateSeedData.customers()
         let customerIds = []
         for (const customer of customers) {
@@ -340,20 +345,20 @@ export const populateTestData = async (businessId, userId, firestoreService) => 
         }
 
         // 5. For each branch: add inventory, sales, cash flow
-        console.log('🔄 Getting branches...')
+        log('info', '🔄 Getting branches...')
         const branchesSnap = await firestoreService.getBranches(businessId)
         
         for (const branchDoc of branchesSnap.docs) {
             const branchId = branchDoc.id
-            console.log(`\n📍 Populating branch: ${branchId}`)
+            log('info', `📍 Populating branch: ${branchId}`)
 
             // Add inventory
-            console.log('📊 Adding inventory...')
+            log('info', '📊 Adding inventory...')
             const inventory = generateSeedData.inventory(productIds)
             await firestoreService.batchAddInventoryItems(businessId, branchId, inventory)
 
             // Add sample sales
-            console.log('💰 Adding sample sales...')
+            log('info', '💰 Adding sample sales...')
             const sales = generateSeedData.sales(customerIds[0])
             for (const sale of sales) {
                 await firestoreService.addSale(businessId, branchId, {
@@ -363,7 +368,7 @@ export const populateTestData = async (businessId, userId, firestoreService) => 
             }
 
             // Add cash flow
-            console.log('💸 Adding cash flow...')
+            log('info', '💸 Adding cash flow...')
             const cashFlows = generateSeedData.cashFlow()
             for (const cf of cashFlows) {
                 await firestoreService.addCashFlow(businessId, branchId, {
@@ -374,7 +379,7 @@ export const populateTestData = async (businessId, userId, firestoreService) => 
         }
         
         // 6. Add sample staff (Users)
-        console.log('🧑‍🤝‍🧑 Adding sample staff profiles...')
+        log('info', '🧑‍🤝‍🧑 Adding sample staff profiles...')
         const sampleUsers = generateSeedData.users()
         const branches = await firestoreService.getBranches(businessId)
         const firstBranchId = branches.docs[0]?.id
@@ -405,7 +410,7 @@ export const populateTestData = async (businessId, userId, firestoreService) => 
             })
         }
 
-        console.log('✅ Test data population complete!')
+        log('done', '✅ Test data population complete!')
         return {
             success: true,
             summary: {
@@ -416,7 +421,7 @@ export const populateTestData = async (businessId, userId, firestoreService) => 
             }
         }
     } catch (error) {
-        console.error('❌ Error populating test data:', error)
+        log('error', `❌ Error populating test data: ${error.message}`)
         return { success: false, error: error.message }
     }
 }
