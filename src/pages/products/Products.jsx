@@ -548,7 +548,7 @@ function Products() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className="text-sm font-black text-blue-600 dark:text-blue-400">{currency} {product.price.toLocaleString()}</span>
+                                            <span className="text-sm font-black text-blue-600 dark:text-blue-400">{currency} {(product.price || product.basePrice || 0).toLocaleString()}</span>
                                         </td>
                                         <td className="px-4 py-3">
                                             <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-widest inline-block w-fit ${product.stock <= 5 ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-green-50 dark:bg-green-900/20 text-green-500'}`}>

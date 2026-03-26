@@ -46,7 +46,8 @@ export const generateSeedData = {
         {
             name: 'iPhone 15 Pro',
             sku: 'APP-IP15-PRO-001',
-            basePrice: 250000,
+            price: 250000,
+            costPrice: 200000,
             category_id: 'cat-phones',
             description: 'Latest Apple iPhone 15 Pro',
             image: 'https://via.placeholder.com/200',
@@ -58,15 +59,20 @@ export const generateSeedData = {
         {
             name: 'Samsung Galaxy S24',
             sku: 'SAM-S24-001',
-            basePrice: 200000,
+            price: 220000,
+            costPrice: 180000,
             category_id: 'cat-phones',
-            description: 'Samsung Galaxy S24',
-            image: 'https://via.placeholder.com/200'
+            description: 'AI-powered flagship Samsung',
+            image: 'https://via.placeholder.com/200',
+            branchPrices: {
+                'branch-isb': 215000
+            }
         },
         {
             name: 'USB-C Cable',
             sku: 'CABLE-USB-C-001',
-            basePrice: 1500,
+            price: 1500,
+            costPrice: 800,
             category_id: 'cat-cables',
             description: 'High-quality USB-C Cable - 2M',
             image: 'https://via.placeholder.com/200'
@@ -74,7 +80,8 @@ export const generateSeedData = {
         {
             name: 'Phone Case - Silicone',
             sku: 'CASE-SIL-001',
-            basePrice: 800,
+            price: 1200,
+            costPrice: 400,
             category_id: 'cat-cases',
             description: 'Durable Silicone Phone Case',
             image: 'https://via.placeholder.com/200'
@@ -82,7 +89,8 @@ export const generateSeedData = {
         {
             name: 'Screen Protector - Tempered Glass',
             sku: 'PROT-GLASS-001',
-            basePrice: 500,
+            price: 500,
+            costPrice: 150,
             category_id: 'cat-protectors',
             description: 'Tempered Glass Screen Protector',
             image: 'https://via.placeholder.com/200'
