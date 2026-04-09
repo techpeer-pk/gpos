@@ -9,6 +9,8 @@ import toast from 'react-hot-toast'
 const menuItems = [
     { path: '/dashboard', icon: '📊', label: 'Dashboard', roles: ['owner', 'manager', 'cashier'] },
     { path: '/pos', icon: '🛒', label: 'POS', roles: ['owner', 'manager', 'cashier'] },
+    { path: '/tables', icon: '🪑', label: 'Tables', roles: ['owner', 'manager', 'cashier'] },
+    { path: '/table-order', icon: '🍽️', label: 'Take Order', roles: ['owner', 'manager', 'cashier'] },
     { path: '/products', icon: '📦', label: 'Products', roles: ['owner', 'manager'] },
     { path: '/inventory', icon: '🏪', label: 'Inventory', roles: ['owner', 'manager'] },
     { path: '/suppliers', icon: '🏭', label: 'Suppliers', roles: ['owner', 'manager'] },
@@ -53,6 +55,7 @@ function Sidebar({ isOpen, setIsOpen }) {
 
     const menuGroups = [
         { title: 'Main', paths: ['/dashboard', '/pos'] },
+        { title: 'Restaurant', paths: ['/tables', '/table-order'] },
         { title: 'Management', paths: ['/products', '/inventory', '/suppliers', '/purchase-orders'] },
         { title: 'Sales', paths: ['/sales', '/customers'] },
         { title: 'Administration', paths: ['/employees', '/branches', '/reports', '/settings', '/import', '/backup'] },

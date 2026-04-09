@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Layout from '../../components/layout/Layout'
 import FirestoreService from '../../firebase/firestore-multi-branch'
 import useAuthStore from '../../store/authStore-multi-branch'
 import { handleError, showSuccess } from '../../utils/errorHandler'
 import { serverTimestamp } from 'firebase/firestore'
+import { storage } from '../../firebase/config'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
 const ROWS_OPTIONS = [10, 25, 50, 100]
 
@@ -26,7 +28,11 @@ function Products() {
         category: '',
         unit: 'pcs',
         barcode: '',
+        imageUrl: '',
+        description: '',
     })
+    const [imageUploading, setImageUploading] = useState(false)
+    const fileInputRef = useRef(null)
     const [editingProduct, setEditingProduct] = useState(null)
     const [initialLoading, setInitialLoading] = useState(true)
     const [search, setSearch] = useState('')
@@ -47,6 +53,21 @@ function Products() {
         if (!catId) return '-'
         const cat = categories.find(c => c.id === catId)
         return cat ? cat.name : catId
+    }
+
+    // Upload image to Firebase Storage
+    const uploadImage = async (file, productName) => {
+        setImageUploading(true)
+        try {
+            const ext = file.name.split('.').pop()
+            const fileName = `products/${businessId}/${Date.now()}_${productName.replace(/\s+/g, '_')}.${ext}`
+            const storageRef = ref(storage, fileName)
+            await uploadBytes(storageRef, file)
+            const url = await getDownloadURL(storageRef)
+            return url
+        } finally {
+            setImageUploading(false)
+        }
     }
 
     // Fetch Products + Categories
@@ -89,18 +110,21 @@ function Products() {
         e.preventDefault()
         setLoading(true)
         try {
+            let imageUrl = form.imageUrl
+            if (fileInputRef.current?.files?.[0]) {
+                imageUrl = await uploadImage(fileInputRef.current.files[0], form.name)
+            }
             const productData = {
                 ...form,
+                imageUrl,
                 price: parseFloat(form.price),
                 costPrice: parseFloat(form.costPrice),
                 active: true,
                 createdAt: serverTimestamp()
             }
 
-            // Use hierarchical API
             const docRef = await FirestoreService.addProduct(businessId, productData)
 
-            // Auto-create inventory record for this branch (and keep it simple for now)
             await FirestoreService.addInventory(businessId, branchId, docRef.id, {
                 productId: docRef.id,
                 quantity: 0,
@@ -108,7 +132,8 @@ function Products() {
                 lastUpdated: serverTimestamp()
             })
 
-            setForm({ name: '', price: '', costPrice: '', category: '', unit: 'pcs', barcode: '' })
+            setForm({ name: '', price: '', costPrice: '', category: '', unit: 'pcs', barcode: '', imageUrl: '', description: '' })
+            if (fileInputRef.current) fileInputRef.current.value = ''
             setShowForm(false)
             showSuccess('Product added successfully')
             fetchProducts()
@@ -338,6 +363,46 @@ function Products() {
                                 <option value="box">Box</option>
                             </select>
                         </div>
+                        <div className="col-span-1 md:col-span-2">
+                            <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1 block">Food Image</label>
+                            <div className="flex gap-3 items-start">
+                                <div className="flex-1 space-y-2">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        ref={fileInputRef}
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0]
+                                            if (file) setForm({ ...form, imageUrl: URL.createObjectURL(file) })
+                                        }}
+                                        className="w-full border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                    />
+                                    <input
+                                        type="url"
+                                        value={fileInputRef.current?.files?.[0] ? '' : form.imageUrl}
+                                        onChange={(e) => {
+                                            if (fileInputRef.current) fileInputRef.current.value = ''
+                                            setForm({ ...form, imageUrl: e.target.value })
+                                        }}
+                                        className="w-full border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        placeholder="Or paste image URL..."
+                                    />
+                                </div>
+                                {form.imageUrl && (
+                                    <img src={form.imageUrl} alt="preview" className="w-20 h-20 object-cover rounded-xl border dark:border-gray-700 flex-shrink-0" />
+                                )}
+                            </div>
+                        </div>
+                        <div className="col-span-1 md:col-span-2">
+                            <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1 block">Description (for Digital Menu)</label>
+                            <textarea
+                                value={form.description}
+                                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                                rows={2}
+                                className="w-full border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                                placeholder="Short description shown on digital menu..."
+                            />
+                        </div>
                         <div className="col-span-1 md:col-span-2 flex gap-3 justify-end pt-4">
                             <button
                                 type="button"
@@ -440,6 +505,31 @@ function Products() {
                                     <option value="ltr">Liter (ltr)</option>
                                     <option value="box">Box</option>
                                 </select>
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1 block">Food Image URL</label>
+                                <div className="flex gap-3 items-center">
+                                    <input
+                                        type="url"
+                                        value={editingProduct.imageUrl || ''}
+                                        onChange={(e) => setEditingProduct({ ...editingProduct, imageUrl: e.target.value })}
+                                        className="flex-1 border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="https://..."
+                                    />
+                                    {editingProduct.imageUrl && (
+                                        <img src={editingProduct.imageUrl} alt="preview" className="w-16 h-16 object-cover rounded-xl border dark:border-gray-700 flex-shrink-0" />
+                                    )}
+                                </div>
+                            </div>
+                            <div className="col-span-1 md:col-span-2">
+                                <label className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1 block">Description</label>
+                                <textarea
+                                    value={editingProduct.description || ''}
+                                    onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                                    rows={2}
+                                    className="w-full border dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                                    placeholder="Short description for digital menu..."
+                                />
                             </div>
                             <div className="col-span-1 md:col-span-2 flex gap-3 justify-end mt-6">
                                 <button

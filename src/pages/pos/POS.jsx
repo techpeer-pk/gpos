@@ -549,17 +549,32 @@ function POS() {
 
                     <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pb-24 lg:pb-4">
                         {filtered.map(product => (
-                            <button key={product.id} onClick={() => addToCart(product)} className="bg-white dark:bg-gray-900 rounded-xl p-4 shadow-sm hover:shadow-md dark:hover:shadow-blue-900/20 hover:border-blue-500 border-2 border-transparent transition text-left">
-                                <div className="w-full h-16 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex items-center justify-center mb-3"><span className="text-3xl">📦</span></div>
-                                <p className="font-medium text-gray-800 dark:text-gray-100 text-sm truncate">{product.name}</p>
-                                <p className="text-blue-600 dark:text-blue-400 font-bold mt-1">{currency} {product.price}</p>
-                                <div className="flex items-center justify-between mt-1">
-                                    <p className="text-gray-400 dark:text-gray-500 text-xs">{getCategoryName(product.category)}</p>
-                                    {product.stock !== null && (
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${product.stock <= 0 ? 'bg-red-100 dark:bg-red-900/20 text-red-500' : product.stock <= 10 ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600' : 'bg-green-100 dark:bg-green-900/20 text-green-600'}`}>
-                                            {product.stock <= 0 ? 'Out' : `${product.stock} left`}
-                                        </span>
-                                    )}
+                            <button key={product.id} onClick={() => addToCart(product)} className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden shadow-sm hover:shadow-md dark:hover:shadow-blue-900/20 hover:border-blue-500 border-2 border-transparent transition text-left">
+                                {product.imageUrl ? (
+                                    <img
+                                        src={product.imageUrl}
+                                        alt={product.name}
+                                        className="w-full h-28 object-cover"
+                                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+                                    />
+                                ) : null}
+                                <div
+                                    className="w-full h-28 bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center"
+                                    style={{ display: product.imageUrl ? 'none' : 'flex' }}
+                                >
+                                    <span className="text-4xl">🍽️</span>
+                                </div>
+                                <div className="p-3">
+                                    <p className="font-medium text-gray-800 dark:text-gray-100 text-sm truncate">{product.name}</p>
+                                    <p className="text-blue-600 dark:text-blue-400 font-bold mt-1">{currency} {product.price}</p>
+                                    <div className="flex items-center justify-between mt-1">
+                                        <p className="text-gray-400 dark:text-gray-500 text-xs">{getCategoryName(product.category)}</p>
+                                        {product.stock !== null && (
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${product.stock <= 0 ? 'bg-red-100 dark:bg-red-900/20 text-red-500' : product.stock <= 10 ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-600' : 'bg-green-100 dark:bg-green-900/20 text-green-600'}`}>
+                                                {product.stock <= 0 ? 'Out' : `${product.stock} left`}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </button>
                         ))}

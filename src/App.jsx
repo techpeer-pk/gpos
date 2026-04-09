@@ -38,6 +38,8 @@ import POInvoice from './pages/inventory/POInvoice'
 import PublicDocumentation from './pages/public/PublicDocumentation'
 import Purpose from './pages/public/Purpose'
 import NotificationListener from './components/common/NotificationListener'
+import Tables from './pages/restaurant/Tables'
+import TableOrder from './pages/restaurant/TableOrder'
 
 function App() {
   const { user, setUser, loading, setLoading } = useAuthStore()
@@ -138,6 +140,8 @@ function App() {
         <Route path="/pending-approval" element={<PendingApproval />} />
         <Route path="/products" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Products /></ProtectedRoute>} />
         <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
+        <Route path="/tables" element={<ProtectedRoute><Tables /></ProtectedRoute>} />
+        <Route path="/table-order" element={<ProtectedRoute><TableOrder /></ProtectedRoute>} />
         <Route path="/sales" element={<ProtectedRoute><Sales /></ProtectedRoute>} />
         <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
         <Route path="/employees" element={<ProtectedRoute allowedRoles={['owner']}><Employees /></ProtectedRoute>} />

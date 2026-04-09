@@ -741,6 +741,75 @@ export const saveUserFcmToken = async (businessId, userId, token) => {
     }
 }
 
+// ============================================
+// TABLES (Branch-Specific)
+// ============================================
+
+export const addTable = (businessId, branchId, data) => {
+    return addDoc(collection(db, `businesses/${businessId}/branches/${branchId}/tables`), {
+        ...data,
+        status: 'empty',
+        createdAt: serverTimestamp()
+    })
+}
+
+export const getTables = (businessId, branchId) => {
+    return getDocs(query(
+        collection(db, `businesses/${businessId}/branches/${branchId}/tables`),
+        orderBy('number', 'asc')
+    ))
+}
+
+export const updateTable = (businessId, branchId, tableId, data) => {
+    return updateDoc(doc(db, `businesses/${businessId}/branches/${branchId}/tables/${tableId}`), {
+        ...data,
+        updatedAt: serverTimestamp()
+    })
+}
+
+export const deleteTable = (businessId, branchId, tableId) => {
+    return deleteDoc(doc(db, `businesses/${businessId}/branches/${branchId}/tables/${tableId}`))
+}
+
+// ============================================
+// TABLE ORDERS (Branch-Specific)
+// ============================================
+
+export const addTableOrder = (businessId, branchId, data) => {
+    return addDoc(collection(db, `businesses/${businessId}/branches/${branchId}/table_orders`), {
+        ...data,
+        status: 'pending',
+        createdAt: serverTimestamp()
+    })
+}
+
+export const getTableOrders = (businessId, branchId) => {
+    return getDocs(query(
+        collection(db, `businesses/${businessId}/branches/${branchId}/table_orders`),
+        where('status', 'in', ['pending', 'preparing', 'served']),
+        orderBy('createdAt', 'desc')
+    ))
+}
+
+export const getTableOrdersByTable = (businessId, branchId, tableId) => {
+    return getDocs(query(
+        collection(db, `businesses/${businessId}/branches/${branchId}/table_orders`),
+        where('tableId', '==', tableId),
+        where('status', 'in', ['pending', 'preparing', 'served'])
+    ))
+}
+
+export const updateTableOrder = (businessId, branchId, orderId, data) => {
+    return updateDoc(doc(db, `businesses/${businessId}/branches/${branchId}/table_orders/${orderId}`), {
+        ...data,
+        updatedAt: serverTimestamp()
+    })
+}
+
+export const deleteTableOrder = (businessId, branchId, orderId) => {
+    return deleteDoc(doc(db, `businesses/${businessId}/branches/${branchId}/table_orders/${orderId}`))
+}
+
 export default {
     // Products
     addProduct, getProducts, getProductById, updateProduct, deleteProduct,
@@ -775,5 +844,9 @@ export default {
     // Session & Context
     initializeBusiness, getUserSessionContext,
     // Messaging
-    saveUserFcmToken
+    saveUserFcmToken,
+    // Tables
+    addTable, getTables, updateTable, deleteTable,
+    // Table Orders
+    addTableOrder, getTableOrders, getTableOrdersByTable, updateTableOrder, deleteTableOrder,
 }
