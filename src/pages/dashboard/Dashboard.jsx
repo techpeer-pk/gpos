@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Layout from '../../components/layout/Layout'
 import FirestoreService from '../../firebase/firestore-multi-branch'
 import useAuthStore from '../../store/authStore-multi-branch'
@@ -10,8 +10,14 @@ import {
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
+// Pre-compute sale timestamps once, then reuse across all chart ranges
+const withDates = (sales) => sales.map(s => ({ ...s, _t: s.createdAt?.toDate?.() || null }))
+
 function Dashboard() {
     const { businessId, branchId, branchName } = useAuthStore()
+    // allSales stored in ref — chart range changes don't trigger full re-render
+    const allSalesRef = useRef([])
+
     const [stats, setStats] = useState({
         todaySales: 0,
         yesterdaySales: 0,
@@ -23,13 +29,12 @@ function Dashboard() {
         topProducts: [],
         paymentBreakdown: [],
         chartData: [],
-        allSales: [],
         loading: true
     })
     const [chartRange, setChartRange] = useState('weekly')
     const currency = 'PKR'
 
-    const buildChartData = (sales, range) => {
+    const buildChartData = useCallback((salesWithDates, range) => {
         const now = new Date()
         const data = []
 
@@ -39,18 +44,18 @@ function Dashboard() {
                 hour.setHours(now.getHours() - i, 0, 0, 0)
                 const nextHour = new Date(hour)
                 nextHour.setHours(hour.getHours() + 1)
-                const total = sales
-                    .filter(s => { const t = s.createdAt?.toDate?.(); return t && t >= hour && t < nextHour })
-                    .reduce((sum, s) => sum + s.total, 0)
+                const total = salesWithDates
+                    .filter(s => s._t && s._t >= hour && s._t < nextHour)
+                    .reduce((sum, s) => sum + (s.finalAmount || s.total || 0), 0)
                 data.push({ label: `${hour.getHours()}:00`, sales: parseFloat(total.toFixed(2)) })
             }
         } else if (range === 'weekly') {
             for (let i = 6; i >= 0; i--) {
                 const day = new Date(now); day.setDate(now.getDate() - i); day.setHours(0, 0, 0, 0)
                 const nextDay = new Date(day); nextDay.setDate(day.getDate() + 1)
-                const total = sales
-                    .filter(s => { const t = s.createdAt?.toDate?.(); return t && t >= day && t < nextDay })
-                    .reduce((sum, s) => sum + s.total, 0)
+                const total = salesWithDates
+                    .filter(s => s._t && s._t >= day && s._t < nextDay)
+                    .reduce((sum, s) => sum + (s.finalAmount || s.total || 0), 0)
                 data.push({
                     label: day.toLocaleDateString('en-PK', { weekday: 'short', day: 'numeric' }),
                     sales: parseFloat(total.toFixed(2))
@@ -60,54 +65,53 @@ function Dashboard() {
             for (let i = 3; i >= 0; i--) {
                 const weekStart = new Date(now); weekStart.setDate(now.getDate() - (i + 1) * 7); weekStart.setHours(0, 0, 0, 0)
                 const weekEnd = new Date(now); weekEnd.setDate(now.getDate() - i * 7); weekEnd.setHours(23, 59, 59, 999)
-                const total = sales
-                    .filter(s => { const t = s.createdAt?.toDate?.(); return t && t >= weekStart && t <= weekEnd })
-                    .reduce((sum, s) => sum + s.total, 0)
+                const total = salesWithDates
+                    .filter(s => s._t && s._t >= weekStart && s._t <= weekEnd)
+                    .reduce((sum, s) => sum + (s.finalAmount || s.total || 0), 0)
                 data.push({ label: `Week ${4 - i}`, sales: parseFloat(total.toFixed(2)) })
             }
         }
 
         return data
-    }
+    }, [])
 
     useEffect(() => {
+        if (!businessId || !branchId) return
+
         const fetchStats = async () => {
             try {
-                // Get all collections using new multi-branch API
-                const [productsSnap, customersSnap, inventorySnap, allSalesSnap] = await Promise.all([
+                const now = new Date()
+                // Fetch only last 30 days of sales — covers all chart ranges (daily/weekly/monthly)
+                const thirtyDaysAgo = new Date(now)
+                thirtyDaysAgo.setDate(now.getDate() - 30)
+                thirtyDaysAgo.setHours(0, 0, 0, 0)
+
+                const [productsSnap, customersSnap, inventorySnap, salesSnap] = await Promise.all([
                     FirestoreService.getProducts(businessId),
                     FirestoreService.getCustomers(businessId),
                     FirestoreService.getInventory(businessId, branchId),
-                    FirestoreService.getSales(businessId, branchId)
+                    FirestoreService.getSalesForDate(businessId, branchId, thirtyDaysAgo, now)
                 ])
 
                 const inventoryList = inventorySnap.docs.map(d => ({ id: d.id, ...d.data() }))
-                const allSales = allSalesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+                const rawSales = salesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+                // Pre-compute Firestore Timestamps once for all chart range switches
+                const allSales = withDates(rawSales)
+                allSalesRef.current = allSales
 
-                // Today / Yesterday
-                const now = new Date()
-                const todayStart = new Date(now)
-                todayStart.setHours(0, 0, 0, 0)
-                const yesterdayStart = new Date(todayStart)
-                yesterdayStart.setDate(yesterdayStart.getDate() - 1)
-                const yesterdayEnd = new Date(todayStart)
+                // Today / Yesterday boundaries
+                const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0)
+                const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1)
 
-                // Filter sales for today and yesterday
-                const todaySales = allSales.filter(s => {
-                    const t = s.createdAt?.toDate?.() || new Date(s.createdAt)
-                    return t >= todayStart && t <= now
-                })
-                const yesterdaySales = allSales.filter(s => {
-                    const t = s.createdAt?.toDate?.() || new Date(s.createdAt)
-                    return t >= yesterdayStart && t < todayStart
-                })
+                const todaySales = allSales.filter(s => s._t && s._t >= todayStart && s._t <= now)
+                const yesterdaySales = allSales.filter(s => s._t && s._t >= yesterdayStart && s._t < todayStart)
 
                 const tSales = todaySales.reduce((sum, d) => sum + (d.finalAmount || d.total || 0), 0)
                 const ySales = yesterdaySales.reduce((sum, d) => sum + (d.finalAmount || d.total || 0), 0)
 
                 // Top Products
                 const productSalesMap = {}
-                allSales.forEach(sale => {
+                rawSales.forEach(sale => {
                     sale.items?.forEach(item => {
                         if (!productSalesMap[item.name]) productSalesMap[item.name] = { name: item.name, quantity: 0, revenue: 0 }
                         productSalesMap[item.name].quantity += item.quantity
@@ -118,7 +122,7 @@ function Dashboard() {
 
                 // Payment Breakdown
                 const paymentMap = {}
-                allSales.forEach(sale => {
+                rawSales.forEach(sale => {
                     const method = sale.paymentMethod || 'cash'
                     if (!paymentMap[method]) paymentMap[method] = 0
                     paymentMap[method] += sale.finalAmount || sale.total || 0
@@ -148,7 +152,6 @@ function Dashboard() {
                     topProducts,
                     paymentBreakdown,
                     chartData: buildChartData(allSales, 'weekly'),
-                    allSales,
                     loading: false
                 })
             } catch (err) {
@@ -157,24 +160,24 @@ function Dashboard() {
                 setStats(prev => ({ ...prev, loading: false }))
             }
         }
-        
-        if (businessId && branchId) {
-            fetchStats()
-        }
-    }, [businessId, branchId])
 
-    const handleChartRange = (range) => {
+        fetchStats()
+    }, [businessId, branchId, buildChartData])
+
+    const handleChartRange = useCallback((range) => {
         setChartRange(range)
-        setStats(prev => ({ ...prev, chartData: buildChartData(prev.allSales, range) }))
-    }
+        setStats(prev => ({ ...prev, chartData: buildChartData(allSalesRef.current, range) }))
+    }, [buildChartData])
 
-    const calculateGrowth = (current, previous) => {
-        if (previous === 0) return current > 0 ? 100 : 0
-        return ((current - previous) / previous) * 100
-    }
+    const salesGrowth = useMemo(() => {
+        if (stats.yesterdaySales === 0) return stats.todaySales > 0 ? 100 : 0
+        return ((stats.todaySales - stats.yesterdaySales) / stats.yesterdaySales) * 100
+    }, [stats.todaySales, stats.yesterdaySales])
 
-    const salesGrowth = calculateGrowth(stats.todaySales, stats.yesterdaySales)
-    const transGrowth = calculateGrowth(stats.todayTransactions, stats.yesterdayTransactions)
+    const transGrowth = useMemo(() => {
+        if (stats.yesterdayTransactions === 0) return stats.todayTransactions > 0 ? 100 : 0
+        return ((stats.todayTransactions - stats.yesterdayTransactions) / stats.yesterdayTransactions) * 100
+    }, [stats.todayTransactions, stats.yesterdayTransactions])
 
     if (stats.loading) {
         return (
