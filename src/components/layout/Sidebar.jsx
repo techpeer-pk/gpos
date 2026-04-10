@@ -32,9 +32,9 @@ const menuItems = [
     { path: '/user-settings', icon: '👤', label: 'Profile', roles: ['owner', 'manager', 'cashier'] },
 ]
 
-function Sidebar({ isOpen, setIsOpen }) {
+function Sidebar({ isOpen, setIsOpen, isCollapsed }) {
     const navigate = useNavigate()
-    const { user, businessId, userRole, branchName, assignedBranches, switchBranch } = useAuthStore()
+    const { user, businessId, userRole, branchName, assignedBranches, switchBranch, businessType } = useAuthStore()
     const [showBranchDropdown, setShowBranchDropdown] = useState(false)
     const [notifLoading, setNotifLoading] = useState(false)
 
@@ -49,13 +49,18 @@ function Sidebar({ isOpen, setIsOpen }) {
         setNotifLoading(false)
     }
 
-    const filteredMenu = menuItems.filter(item =>
-        !item.roles || item.roles.includes(userRole)
-    )
+    const restaurantPaths = ['/tables', '/table-order']
+    const filteredMenu = menuItems.filter(item => {
+        if (!item.roles || !item.roles.includes(userRole)) return false
+        if (restaurantPaths.includes(item.path) && businessType !== 'restaurant') return false
+        return true
+    })
+
+    const isRestaurant = businessType === 'restaurant'
 
     const menuGroups = [
         { title: 'Main', paths: ['/dashboard', '/pos'] },
-        { title: 'Restaurant', paths: ['/tables', '/table-order'] },
+        ...(isRestaurant ? [{ title: 'Restaurant', paths: ['/tables', '/table-order'] }] : []),
         { title: 'Management', paths: ['/products', '/inventory', '/suppliers', '/purchase-orders'] },
         { title: 'Sales', paths: ['/sales', '/customers'] },
         { title: 'Administration', paths: ['/employees', '/branches', '/reports', '/settings', '/import', '/backup'] },
@@ -77,16 +82,22 @@ function Sidebar({ isOpen, setIsOpen }) {
     }
 
     return (
-        <div className={`h-screen w-64 bg-gray-900 dark:bg-black text-white flex flex-col fixed left-0 top-0 z-[50] transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className={`h-screen bg-gray-900 dark:bg-black text-white flex flex-col fixed left-0 top-0 z-[50] transition-all duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'} ${isCollapsed ? 'w-16' : 'w-64'}`}>
 
             {/* Logo */}
-            <div className="p-6 border-b border-gray-700 dark:border-gray-800">
-                <h1 className="text-2xl font-bold text-blue-400">GPOS</h1>
-                <p className="text-gray-400 text-xs mt-1">General Point of Sale</p>
+            <div className={`border-b border-gray-700 dark:border-gray-800 flex items-center ${isCollapsed ? 'p-3 justify-center' : 'p-6'}`}>
+                {isCollapsed ? (
+                    <span className="text-blue-400 font-black text-lg">G</span>
+                ) : (
+                    <>
+                        <h1 className="text-2xl font-bold text-blue-400">GPOS</h1>
+                        <p className="text-gray-400 text-xs mt-1 ml-2">General Point of Sale</p>
+                    </>
+                )}
             </div>
 
             {/* Branch Selector */}
-            {assignedBranches && assignedBranches.length > 0 && (
+            {!isCollapsed && assignedBranches && assignedBranches.length > 0 && (
                 <div className="px-6 py-4 border-b border-gray-700 dark:border-gray-800">
                     <div className="relative">
                         <button
@@ -128,64 +139,87 @@ function Sidebar({ isOpen, setIsOpen }) {
                 </div>
             )}
             {/* Menu (grouped) */}
-            <nav className="flex-1 p-4 space-y-4 overflow-y-auto">
-                {menuGroups.map((group) => {
-                    const items = filteredMenu.filter(i => group.paths.includes(i.path))
-                    if (!items.length) return null
-                    const open = !!openGroups[group.title]
-                    return (
-                        <div key={group.title}>
-                            <button
-                                type="button"
-                                onClick={() => setOpenGroups(prev => ({ ...prev, [group.title]: !prev[group.title] }))}
-                                className="w-full flex items-center justify-between px-2 mb-2 text-xs uppercase text-gray-400 font-black h-8"
-                                aria-expanded={open}
-                            >
-                                <span>{group.title}</span>
-                                <span className={`transform transition-transform text-gray-500 hover:text-white ${open ? 'rotate-90' : ''}`}>▸</span>
-                            </button>
+            <nav className={`flex-1 overflow-y-auto transition-all ${isCollapsed ? 'p-2 space-y-1' : 'p-4 space-y-4'}`}>
+                {isCollapsed ? (
+                    // Collapsed — icon only
+                    filteredMenu.map((item) => (
+                        <NavLink
+                            key={item.path}
+                            to={item.path}
+                            onClick={() => setIsOpen(false)}
+                            title={item.label}
+                            className={({ isActive }) =>
+                                `flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition text-lg ${isActive
+                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                                    : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+                                }`
+                            }
+                        >
+                            {item.icon}
+                        </NavLink>
+                    ))
+                ) : (
+                    // Expanded — grouped with labels
+                    menuGroups.map((group) => {
+                        const items = filteredMenu.filter(i => group.paths.includes(i.path))
+                        if (!items.length) return null
+                        const open = !!openGroups[group.title]
+                        return (
+                            <div key={group.title}>
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenGroups(prev => ({ ...prev, [group.title]: !prev[group.title] }))}
+                                    className="w-full flex items-center justify-between px-2 mb-2 text-xs uppercase text-gray-400 font-black h-8"
+                                    aria-expanded={open}
+                                >
+                                    <span>{group.title}</span>
+                                    <span className={`transform transition-transform text-gray-500 hover:text-white ${open ? 'rotate-90' : ''}`}>▸</span>
+                                </button>
 
-                            {open && (
-                                <div className="bg-gray-800/50 dark:bg-white/5 rounded-lg p-2 space-y-1">
-                                    {items.map((item) => (
-                                        <NavLink
-                                            key={item.path}
-                                            to={item.path}
-                                            onClick={() => setIsOpen(false)}
-                                            className={({ isActive }) =>
-                                                `flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-medium ${isActive
-                                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                                                    : 'text-gray-400 hover:bg-gray-700 dark:hover:bg-white/10 hover:text-white'
-                                                }`
-                                            }
-                                        >
-                                            <span className="text-lg">{item.icon}</span>
-                                            {item.label}
-                                        </NavLink>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )
-                })}
+                                {open && (
+                                    <div className="bg-gray-800/50 dark:bg-white/5 rounded-lg p-2 space-y-1">
+                                        {items.map((item) => (
+                                            <NavLink
+                                                key={item.path}
+                                                to={item.path}
+                                                onClick={() => setIsOpen(false)}
+                                                className={({ isActive }) =>
+                                                    `flex items-center gap-3 px-4 py-3 rounded-md transition text-sm font-medium ${isActive
+                                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                                                        : 'text-gray-400 hover:bg-gray-700 dark:hover:bg-white/10 hover:text-white'
+                                                    }`
+                                                }
+                                            >
+                                                <span className="text-lg">{item.icon}</span>
+                                                {item.label}
+                                            </NavLink>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )
+                    })
+                )}
             </nav>
 
             {/* Notifications & Logout */}
-            <div className="p-4 border-t border-gray-700 dark:border-gray-800 space-y-2">
+            <div className={`border-t border-gray-700 dark:border-gray-800 space-y-2 ${isCollapsed ? 'p-2' : 'p-4'}`}>
                 <button
                     onClick={handleEnableNotifications}
                     disabled={notifLoading}
-                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-blue-400 hover:bg-blue-600/10 transition w-full text-sm font-medium border border-blue-900/30"
+                    title="Enable Alerts"
+                    className={`flex items-center rounded-lg text-blue-400 hover:bg-blue-600/10 transition w-full font-medium border border-blue-900/30 ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-3 text-sm'}`}
                 >
                     <span className="text-lg">{notifLoading ? '⌛' : '🔔'}</span>
-                    {notifLoading ? 'Enabling...' : 'Enable Alerts'}
+                    {!isCollapsed && (notifLoading ? 'Enabling...' : 'Enable Alerts')}
                 </button>
                 <button
                     onClick={handleLogout}
-                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-500 hover:bg-red-600 hover:text-white transition w-full text-sm font-medium"
+                    title="Logout"
+                    className={`flex items-center rounded-lg text-gray-500 hover:bg-red-600 hover:text-white transition w-full font-medium ${isCollapsed ? 'justify-center p-2' : 'gap-3 px-4 py-3 text-sm'}`}
                 >
                     <span className="text-lg">🚪</span>
-                    Logout
+                    {!isCollapsed && 'Logout'}
                 </button>
             </div>
 

@@ -786,8 +786,7 @@ export const addTableOrder = (businessId, branchId, data) => {
 export const getTableOrders = (businessId, branchId) => {
     return getDocs(query(
         collection(db, `businesses/${businessId}/branches/${branchId}/table_orders`),
-        where('status', 'in', ['pending', 'preparing', 'served']),
-        orderBy('createdAt', 'desc')
+        where('status', 'in', ['pending', 'preparing', 'served'])
     ))
 }
 

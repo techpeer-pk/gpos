@@ -3,7 +3,7 @@
         "rules": "firestore.rules"
     },
     "hosting": {
-        "site": "gpos-dev-cx",
+        "site": "gpos-res",
         "public": "dist",
         "ignore": [
             "firebase.json",

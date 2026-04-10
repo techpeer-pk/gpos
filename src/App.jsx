@@ -59,15 +59,26 @@ function App() {
 
           if (context) {
             console.log(`🔐 Session Synced: User=${currentUser.uid} Role=${context.role} Biz=${context.businessId}`)
-            
-            // Restore full state including the correctly forced 'owner' role
+
             useAuthStore.setState({
               businessId: context.businessId,
               branchId: useAuthStore.getState().branchId || context.branchId,
               branchName: useAuthStore.getState().branchName || context.branchName,
-              userRole: context.role || 'cashier', 
+              userRole: context.role || 'cashier',
               assignedBranches: context.branches || []
             })
+
+            // Load businessType from Firestore
+            try {
+              const { getBusiness } = await import('./firebase/firestore-multi-branch')
+              const bizSnap = await getBusiness(context.businessId)
+              if (bizSnap.exists()) {
+                const bizType = bizSnap.data().businessType || 'retail'
+                useAuthStore.setState({ businessType: bizType })
+              }
+            } catch (e) {
+              console.warn('Could not load businessType', e)
+            }
           } else {
             console.warn(`⚠️ No session context found for ${currentUser.uid}`)
           }

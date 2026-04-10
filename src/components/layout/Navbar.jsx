@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import useAuthStore from '../../store/authStore-multi-branch'
 import useThemeStore from '../../store/themeStore'
 
-function Navbar({ title, onMenuClick }) {
+function Navbar({ title, onMenuClick, onToggleCollapse, isCollapsed }) {
     const { user, userRole } = useAuthStore()
     const { isDarkMode, toggleTheme } = useThemeStore()
     const [isOnline, setIsOnline] = useState(navigator.onLine)
@@ -21,14 +21,23 @@ function Navbar({ title, onMenuClick }) {
     }, [])
 
     return (
-        <div className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 md:px-6 fixed top-0 left-0 lg:left-64 right-0 z-[30] transition-colors duration-300">
+        <div className={`h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 md:px-6 fixed top-0 right-0 z-[30] transition-all duration-300 ${isCollapsed ? 'left-0 lg:left-16' : 'left-0 lg:left-64'}`}>
 
             <div className="flex items-center gap-3">
+                {/* Mobile toggle */}
                 <button
                     onClick={onMenuClick}
                     className="p-2 -ml-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg lg:hidden"
                 >
                     <span className="text-xl dark:text-gray-400">☰</span>
+                </button>
+                {/* Desktop toggle */}
+                <button
+                    onClick={onToggleCollapse}
+                    className="hidden lg:flex p-2 -ml-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition items-center justify-center"
+                    title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+                >
+                    <span className="text-lg">{isCollapsed ? '▶' : '◀'}</span>
                 </button>
                 {/* Page Title */}
                 <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100 line-clamp-1">{title}</h2>

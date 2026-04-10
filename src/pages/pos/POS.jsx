@@ -18,15 +18,20 @@ const CartPanel = memo(({
     lastSaleId, lastSaleData, success,
     loading, handleCheckout, handleHoldSale, clearCart,
     setMobileCartOpen, updateQty, removeFromCart, handleShare,
-    businessId, branchId
+    businessId, branchId, activeTableOrderId
 }) => (
     <>
         {/* Cart Header */}
         <div className="p-4 border-b dark:border-gray-800 space-y-3 flex-shrink-0">
             <div className="flex justify-between items-center">
-                <h3 className="font-bold text-gray-800 dark:text-gray-100 text-lg">
-                    🛒 Cart ({cart.length} items)
-                </h3>
+                <div>
+                    <h3 className="font-bold text-gray-800 dark:text-gray-100 text-lg">
+                        🛒 Cart ({cart.length} items)
+                    </h3>
+                    {activeTableOrderId && (
+                        <p className="text-[10px] font-black text-orange-600 dark:text-orange-400 uppercase tracking-widest mt-0.5">🪑 Table Order Loaded</p>
+                    )}
+                </div>
                 <button
                     className="lg:hidden text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl"
                     onClick={() => setMobileCartOpen(false)}
@@ -208,7 +213,11 @@ function POS() {
     const [lastSaleData, setLastSaleData] = useState(null)
     const [mobileCartOpen, setMobileCartOpen] = useState(false)
     const [barcodeFlash, setBarcodeFlash] = useState(false)
-    const { user, businessId, branchId } = useAuthStore()
+    const [tableOrders, setTableOrders] = useState([])
+    const [activeTab, setActiveTab] = useState('products')
+    const [activeTableOrderId, setActiveTableOrderId] = useState(null)
+    const [activeTableId, setActiveTableId] = useState(null)
+    const { user, businessId, branchId, businessType } = useAuthStore()
 
     const [amountPaid, setAmountPaid] = useState('')
 
@@ -267,6 +276,12 @@ function POS() {
                 // Get suspended sales for this branch
                 const suspSnap = await FirestoreService.getSuspendedSales(businessId, branchId)
                 setSuspendedSales(suspSnap.docs.map(d => ({ id: d.id, ...d.data() })))
+
+                // Get pending table orders (restaurant mode)
+                try {
+                    const tableOrderSnap = await FirestoreService.getTableOrders(businessId, branchId)
+                    setTableOrders(tableOrderSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(o => o.status === 'pending'))
+                } catch (_) { /* not a restaurant */ }
             } catch (err) {
                 console.error('POS fetch error:', err)
             } finally {
@@ -430,6 +445,17 @@ function POS() {
                 }
             }
 
+            // Complete table order if loaded from restaurant
+            if (activeTableOrderId) {
+                try {
+                    await FirestoreService.updateTableOrder(businessId, branchId, activeTableOrderId, { status: 'completed' })
+                    await FirestoreService.updateTable(businessId, branchId, activeTableId, { status: 'empty' })
+                    setTableOrders(prev => prev.filter(o => o.id !== activeTableOrderId))
+                    setActiveTableOrderId(null)
+                    setActiveTableId(null)
+                } catch (e) { console.error('Table order complete error:', e) }
+            }
+
             setCart([])
             setAmountPaid('')
             setSelectedCustomer(null)
@@ -482,6 +508,21 @@ function POS() {
         }
     }
 
+    const loadTableOrder = (order) => {
+        if (cart.length > 0 && !window.confirm('Current cart will be cleared. Continue?')) return
+        setCart(order.items.map(i => ({
+            id: i.productId,
+            name: i.name,
+            price: i.price,
+            quantity: i.qty,
+            imageUrl: i.imageUrl || ''
+        })))
+        setActiveTableOrderId(order.id)
+        setActiveTableId(order.tableId)
+        setActiveTab('products')
+        showSuccess(`Table ${order.tableNumber} order loaded into cart!`)
+    }
+
     const restoreHeldSale = async (heldSale) => {
         if (cart.length > 0 && !window.confirm('Current cart will be cleared. Continue?')) return
         setCart(heldSale.items)
@@ -502,10 +543,11 @@ function POS() {
         settings, redeemPoints, setRedeemPoints, redemptionValue,
         paymentMethod, setPaymentMethod,
         amountPaid, setAmountPaid,
-        lastSaleId, success, loading,
+        lastSaleId, lastSaleData, success, loading,
         handleCheckout, handleHoldSale, clearCart,
         setMobileCartOpen, updateQty, removeFromCart, handleShare,
-        businessId, branchId
+        businessId, branchId,
+        activeTableOrderId
     }
 
     return (
@@ -534,7 +576,70 @@ function POS() {
                         </button>
                     </div>
 
-                    {categories.length > 0 && (
+                    {/* Restaurant Tab Toggle */}
+                    {businessType === 'restaurant' && (
+                        <div className="flex gap-2 mb-4">
+                            <button
+                                onClick={() => setActiveTab('products')}
+                                className={`flex-1 py-2 rounded-xl font-bold text-sm transition ${activeTab === 'products' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border dark:border-gray-700 hover:border-blue-400'}`}
+                            >🛒 Products</button>
+                            <button
+                                onClick={() => setActiveTab('table-orders')}
+                                className={`flex-1 py-2 rounded-xl font-bold text-sm transition relative ${activeTab === 'table-orders' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border dark:border-gray-700 hover:border-orange-400'}`}
+                            >
+                                🪑 Table Orders
+                                {tableOrders.length > 0 && (
+                                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full animate-pulse">{tableOrders.length}</span>
+                                )}
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Table Orders Panel */}
+                    {activeTab === 'table-orders' && (
+                        <div className="space-y-3 pb-24 lg:pb-4">
+                            {tableOrders.length === 0 ? (
+                                <div className="text-center py-16 text-gray-400 dark:text-gray-500 bg-white dark:bg-gray-900 rounded-xl border-2 border-dashed">
+                                    <p className="text-4xl mb-3">🪑</p>
+                                    <p className="font-bold">No pending table orders</p>
+                                    <p className="text-sm mt-1">Orders placed by waiters will appear here</p>
+                                </div>
+                            ) : (
+                                tableOrders.map(order => (
+                                    <div key={order.id} className="bg-white dark:bg-gray-900 rounded-2xl border-2 border-orange-200 dark:border-orange-800 p-5 shadow-sm hover:shadow-md transition">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-2xl font-black text-orange-600 dark:text-orange-400">Table {order.tableNumber}</span>
+                                                    <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Pending</span>
+                                                    {activeTableOrderId === order.id && <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">In Cart</span>}
+                                                </div>
+                                                <p className="text-xs text-gray-400 mt-0.5">Waiter: {order.waiterName || 'Staff'}</p>
+                                            </div>
+                                            <p className="text-xl font-black text-gray-800 dark:text-gray-100">{order.currency} {order.subtotal?.toFixed(0)}</p>
+                                        </div>
+                                        <div className="space-y-1 mb-4">
+                                            {order.items?.map((item, idx) => (
+                                                <div key={idx} className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                                                    <span>{item.qty}x {item.name}</span>
+                                                    <span>{order.currency} {item.total?.toFixed(0)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {order.note && <p className="text-xs italic text-gray-400 dark:text-gray-500 mb-3">Note: {order.note}</p>}
+                                        <button
+                                            onClick={() => loadTableOrder(order)}
+                                            className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-xl font-black text-sm transition shadow-md shadow-orange-500/20"
+                                        >
+                                            {activeTableOrderId === order.id ? '✓ Loaded — Go to Cart' : '📥 Load to Cart & Checkout'}
+                                        </button>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'products' && categories.length > 0 && (
                         <div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
                             <button onClick={() => setActiveCategory('all')} className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition flex-shrink-0 ${activeCategory === 'all' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border dark:border-gray-700 hover:border-blue-400'}`}>
                                 {categories.find(c => c.icon)?.icon || '🏪'} All
@@ -547,6 +652,7 @@ function POS() {
                         </div>
                     )}
 
+                    {activeTab === 'products' && (
                     <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pb-24 lg:pb-4">
                         {filtered.map(product => (
                             <button key={product.id} onClick={() => addToCart(product)} className="bg-white dark:bg-gray-900 rounded-xl overflow-hidden shadow-sm hover:shadow-md dark:hover:shadow-blue-900/20 hover:border-blue-500 border-2 border-transparent transition text-left">
@@ -584,6 +690,7 @@ function POS() {
                             </div>
                         )}
                     </div>
+                    )}
                 </div>
 
                 {/* Desktop Cart */}

@@ -6,6 +6,7 @@ import { handleError, showSuccess } from '../../utils/errorHandler'
 
 function Settings() {
     const { businessId, branchId } = useAuthStore()
+    const setBusinessType = (t) => useAuthStore.setState({ businessType: t })
     const [loading, setLoading] = useState(false)
     const [saved, setSaved] = useState(false)
     const [settings, setSettings] = useState({
@@ -82,6 +83,7 @@ function Settings() {
                 }
             })
 
+            setBusinessType(settings.businessType)
             setSaved(true)
             showSuccess('Settings updated for this branch')
             setTimeout(() => setSaved(false), 3000)

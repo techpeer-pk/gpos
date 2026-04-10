@@ -22,6 +22,7 @@ const useAuthStore = create(
             businessName: '',
             branchName: '',
             branchLocation: '',
+            businessType: 'retail', // retail | restaurant | service
             
             // User's Available Branches
             assignedBranches: [], // [{ branchId, branchName, role }, ...]
@@ -218,7 +219,8 @@ const useAuthStore = create(
                 businessName: state.businessName,
                 branchName: state.branchName,
                 userRole: state.userRole,
-                assignedBranches: state.assignedBranches
+                assignedBranches: state.assignedBranches,
+                businessType: state.businessType
             })
         }
     )
